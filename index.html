@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Eco Farm - Dashboard Monitoring</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/mqtt@5.3.5/dist/mqtt.min.js"></script>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-leaf"></i>
+                    <span>Smart Eco Farm</span>
+                </div>
+                <div class="header-info">
+                    <div class="realtime-clock" id="realtimeClock">
+                        <i class="fas fa-clock"></i>
+                        <span id="clockDisplay"></span>
+                    </div>
+                    <div class="connection-status" id="connectionStatus">
+                        <i class="fas fa-wifi"></i>
+                        <span>Menghubungkan...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Dashboard -->
+    <main class="main-container">
+        <div class="container">
+            <!-- Status Banner -->
+            <div class="status-banner" id="statusBanner">
+                <div class="status-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="status-text">
+                    <h3 id="statusTitle">NORMAL</h3>
+                    <p id="statusDescription">Kondisi stabil</p>
+                </div>
+            </div>
+
+            <!-- Spray Reminder -->
+            <div class="spray-reminder" id="sprayReminder">
+                <i class="fas fa-spray-can"></i>
+                <span id="sprayStatus">Memuat status penyemprotan...</span>
+            </div>
+
+            <!-- Sensor Cards -->
+            <div class="sensor-grid">
+                <!-- Suhu Card -->
+                <div class="sensor-card">
+                    <div class="sensor-icon temperature">
+                        <i class="fas fa-thermometer-half"></i>
+                    </div>
+                    <div class="sensor-info">
+                        <h4>Suhu</h4>
+                        <div class="sensor-value" id="suhuValue">--</div>
+                        <span class="sensor-unit">°C</span>
+                    </div>
+                </div>
+
+                <!-- Kelembapan Card -->
+                <div class="sensor-card">
+                    <div class="sensor-icon humidity">
+                        <i class="fas fa-tint"></i>
+                    </div>
+                    <div class="sensor-info">
+                        <h4>Kelembapan</h4>
+                        <div class="sensor-value" id="kelembapanValue">--</div>
+                        <span class="sensor-unit">%</span>
+                    </div>
+                </div>
+
+                <!-- Gas Card -->
+                <div class="sensor-card">
+                    <div class="sensor-icon gas">
+                        <i class="fas fa-wind"></i>
+                    </div>
+                    <div class="sensor-info">
+                        <h4>Gas</h4>
+                        <div class="sensor-value" id="gasValue">--</div>
+                        <span class="sensor-unit">ppm</span>
+                    </div>
+                </div>
+
+                <!-- Api Card -->
+                <div class="sensor-card">
+                    <div class="sensor-icon fire">
+                        <i class="fas fa-fire"></i>
+                    </div>
+                    <div class="sensor-info">
+                        <h4>Api</h4>
+                        <div class="sensor-value" id="apiValue">--</div>
+                        <span class="sensor-unit">level</span>
+                    </div>
+                </div>
+
+                <!-- Jarak Card -->
+                <div class="sensor-card">
+                    <div class="sensor-icon distance">
+                        <i class="fas fa-ruler-vertical"></i>
+                    </div>
+                    <div class="sensor-info">
+                        <h4>Jarak Penyimpanan</h4>
+                        <div class="sensor-value" id="jarakValue">--</div>
+                        <span class="sensor-unit">cm</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Section -->
+            <div class="charts-section">
+                <div class="chart-container">
+                    <h3><i class="fas fa-chart-line"></i> Grafik Suhu & Kelembapan</h3>
+                    <div class="chart-wrapper" style="height: 400px;">
+                        <canvas id="tempHumChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-container">
+                    <h3><i class="fas fa-chart-bar"></i> Grafik Gas & Api</h3>
+                    <div class="chart-wrapper" style="height: 400px;">
+                        <canvas id="gasFireChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- History Table -->
+            <div class="history-section">
+                <div class="history-header">
+                    <h3><i class="fas fa-history"></i> Riwayat Data</h3>
+                    <button class="btn-clear" id="btnClearHistory">
+                        <i class="fas fa-trash"></i> Hapus History
+                    </button>
+                </div>
+                <div class="table-responsive">
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th>Waktu</th>
+                                <th>Suhu</th>
+                                <th>Kelembapan</th>
+                                <th>Gas</th>
+                                <th>Api</th>
+                                <th>Jarak</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTableBody">
+                            <tr>
+                                <td colspan="7" class="no-data">Belum ada data</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="pagination" id="pagination"></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Chatbot Button -->
+    <button class="chatbot-btn" id="chatbotBtn">
+        <i class="fas fa-comments"></i>
+        <span class="chatbot-badge">?</span>
+    </button>
+
+    <!-- Chatbot Modal -->
+    <div class="chatbot-modal" id="chatbotModal">
+        <div class="chatbot-header">
+            <div class="chatbot-title">
+                <i class="fas fa-bug"></i>
+                <span>Asisten Hama & Spray</span>
+            </div>
+            <button class="chatbot-close" id="chatbotClose">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="chatbot-body" id="chatbotBody">
+            <div class="chat-message bot">
+                <div class="message-avatar">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <div class="message-content">
+                    <p>Halo! 👋 Saya asisten Smart Eco Farm. Tanya saya tentang:</p>
+                    <ul>
+                        <li>🐛 Cara mengatasi hama tanaman</li>
+                        <li>🌿 Manfaat ekstrak sereh & neem</li>
+                        <li>💧 Cara membuat spray alami</li>
+                        <li>🌱 Tips pencegahan hama</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="chatbot-suggestions" id="chatbotSuggestions">
+            <button class="suggestion-btn" data-question="Bagaimana cara membuat spray ekstrak sereh?">
+                🌿 Cara buat spray sereh
+            </button>
+            <button class="suggestion-btn" data-question="Apa manfaat neem oil untuk tanaman?">
+                🍃 Manfaat neem oil
+            </button>
+            <button class="suggestion-btn" data-question="Bagaimana mencegah hama di gudang penyimpanan?">
+                🐜 Cegah hama gudang
+            </button>
+            <button class="suggestion-btn" data-question="Kapan waktu terbaik penyemprotan?">
+                ⏰ Waktu semprot
+            </button>
+        </div>
+        <div class="chatbot-input">
+            <input type="text" id="chatInput" placeholder="Tanya tentang hama atau spray alami...">
+            <button id="chatSendBtn">
+                <i class="fas fa-paper-plane"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2026 Smart Eco Farm - Monitoring Gudang Penyimpanan Tanaman</p>
+        </div>
+    </footer>
+
+    <script src="js/mqtt.js"></script>
+    <script src="js/charts.js"></script>
+    <script src="js/chatbot.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
