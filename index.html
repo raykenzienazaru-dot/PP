@@ -1,250 +1,368 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Eco Farm - Dashboard Monitoring</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://unpkg.com/mqtt@5.3.5/dist/mqtt.min.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart Eco Farm — Gudang Pertanian Cerdas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,400&family=DM+Sans:wght@300;400;500;600&family=Fira+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-    <!-- Header -->
-    <header class="header">
-        <div class="container">
-            <div class="header-content">
-                <div class="logo">
-                    <i class="fas fa-leaf"></i>
-                    <span>Smart Eco Farm</span>
-                </div>
-                <div class="header-info">
-                    <div class="realtime-clock" id="realtimeClock">
-                        <i class="fas fa-clock"></i>
-                        <span id="clockDisplay"></span>
-                    </div>
-                    <div class="connection-status" id="connectionStatus">
-                        <i class="fas fa-wifi"></i>
-                        <span>Menghubungkan...</span>
-                    </div>
-                </div>
-            </div>
+
+  <!-- NAV -->
+  <nav id="navbar">
+    <div class="nav-logo">
+      <span class="logo-icon">🌿</span>
+      <span class="logo-text">Smart<b>Eco</b>Farm</span>
+    </div>
+    <ul class="nav-links">
+      <li><a href="#hero">Beranda</a></li>
+      <li><a href="#fitur">Fitur</a></li>
+      <li><a href="#hama">Panduan Hama</a></li>
+      <li><a href="#serai">Ekstrak Serai</a></li>
+      <li><a href="#sensor">Sensor</a></li>
+    </ul>
+    <button class="nav-chat-btn" id="openChatBtn">💬 Tanya AI</button>
+  </nav>
+
+  <!-- HERO -->
+  <section id="hero">
+    <div class="hero-bg-grid"></div>
+    <div class="hero-orb orb1"></div>
+    <div class="hero-orb orb2"></div>
+    <div class="hero-content">
+      <div class="hero-badge">🌾 IoT + AI Agriculture</div>
+      <h1 class="hero-title">
+        Gudang Pertanian<br />
+        <em>Lebih Cerdas.</em>
+      </h1>
+      <p class="hero-subtitle">
+        Monitoring real-time, deteksi hama otomatis, dan panduan semprot ekstrak sereh —
+        semua dalam satu sistem terintegrasi untuk petani modern.
+      </p>
+      <div class="hero-actions">
+        <a href="#fitur" class="btn-primary">Lihat Fitur</a>
+        <button class="btn-outline" id="openChatBtn2">💬 Chat dengan AI</button>
+      </div>
+      <div class="hero-stats">
+        <div class="stat"><span class="stat-num">6</span><span class="stat-label">Sensor Aktif</span></div>
+        <div class="stat-divider"></div>
+        <div class="stat"><span class="stat-num">24/7</span><span class="stat-label">Monitoring</span></div>
+        <div class="stat-divider"></div>
+        <div class="stat"><span class="stat-num">AI</span><span class="stat-label">Analisis Hama</span></div>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="device-card">
+        <div class="device-header">
+          <span class="dot green"></span>
+          <span class="dot yellow"></span>
+          <span class="dot red"></span>
+          <span class="device-title">smartfarm/monitoring</span>
         </div>
-    </header>
-
-    <!-- Main Dashboard -->
-    <main class="main-container">
-        <div class="container">
-            <!-- Status Banner -->
-            <div class="status-banner" id="statusBanner">
-                <div class="status-icon">
-                    <i class="fas fa-check-circle"></i>
-                </div>
-                <div class="status-text">
-                    <h3 id="statusTitle">NORMAL</h3>
-                    <p id="statusDescription">Kondisi stabil</p>
-                </div>
-            </div>
-
-            <!-- Spray Reminder -->
-            <div class="spray-reminder" id="sprayReminder">
-                <i class="fas fa-spray-can"></i>
-                <span id="sprayStatus">Memuat status penyemprotan...</span>
-            </div>
-
-            <!-- Sensor Cards -->
-            <div class="sensor-grid">
-                <!-- Suhu Card -->
-                <div class="sensor-card">
-                    <div class="sensor-icon temperature">
-                        <i class="fas fa-thermometer-half"></i>
-                    </div>
-                    <div class="sensor-info">
-                        <h4>Suhu</h4>
-                        <div class="sensor-value" id="suhuValue">--</div>
-                        <span class="sensor-unit">°C</span>
-                    </div>
-                </div>
-
-                <!-- Kelembapan Card -->
-                <div class="sensor-card">
-                    <div class="sensor-icon humidity">
-                        <i class="fas fa-tint"></i>
-                    </div>
-                    <div class="sensor-info">
-                        <h4>Kelembapan</h4>
-                        <div class="sensor-value" id="kelembapanValue">--</div>
-                        <span class="sensor-unit">%</span>
-                    </div>
-                </div>
-
-                <!-- Gas Card -->
-                <div class="sensor-card">
-                    <div class="sensor-icon gas">
-                        <i class="fas fa-wind"></i>
-                    </div>
-                    <div class="sensor-info">
-                        <h4>Gas</h4>
-                        <div class="sensor-value" id="gasValue">--</div>
-                        <span class="sensor-unit">ppm</span>
-                    </div>
-                </div>
-
-                <!-- Api Card -->
-                <div class="sensor-card">
-                    <div class="sensor-icon fire">
-                        <i class="fas fa-fire"></i>
-                    </div>
-                    <div class="sensor-info">
-                        <h4>Api</h4>
-                        <div class="sensor-value" id="apiValue">--</div>
-                        <span class="sensor-unit">level</span>
-                    </div>
-                </div>
-
-                <!-- Jarak Card -->
-                <div class="sensor-card">
-                    <div class="sensor-icon distance">
-                        <i class="fas fa-ruler-vertical"></i>
-                    </div>
-                    <div class="sensor-info">
-                        <h4>Jarak Penyimpanan</h4>
-                        <div class="sensor-value" id="jarakValue">--</div>
-                        <span class="sensor-unit">cm</span>
-                    </div>
-                </div>
-
-                <!-- PIR Sensor Card -->
-                <div class="sensor-card" id="pirCard">
-                    <div class="sensor-icon pir">
-                        <i class="fas fa-person-walking"></i>
-                    </div>
-                    <div class="sensor-info">
-                        <h4>Sensor PIR</h4>
-                        <div class="sensor-value" id="pirValue">--</div>
-                        <span class="pir-badge pir-safe" id="pirBadge">Menunggu data...</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Charts Section -->
-            <div class="charts-section">
-                <div class="chart-container">
-                    <h3><i class="fas fa-chart-line"></i> Grafik Suhu & Kelembapan</h3>
-                    <div class="chart-wrapper" style="height: 400px;">
-                        <canvas id="tempHumChart"></canvas>
-                    </div>
-                </div>
-
-                <div class="chart-container">
-                    <h3><i class="fas fa-chart-bar"></i> Grafik Gas & Api</h3>
-                    <div class="chart-wrapper" style="height: 400px;">
-                        <canvas id="gasFireChart"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            <!-- History Table -->
-            <div class="history-section">
-                <div class="history-header">
-                    <h3><i class="fas fa-history"></i> Riwayat Data</h3>
-                    <button class="btn-clear" id="btnClearHistory">
-                        <i class="fas fa-trash"></i> Hapus History
-                    </button>
-                </div>
-                <div class="table-responsive">
-                    <table class="history-table">
-                        <thead>
-                            <tr>
-                                <th>Waktu</th>
-                                <th>Suhu</th>
-                                <th>Kelembapan</th>
-                                <th>Gas</th>
-                                <th>Api</th>
-                                <th>Jarak</th>
-                                <th>PIR</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody id="historyTableBody">
-                            <tr>
-                                <td colspan="8" class="no-data">Belum ada data</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-                <div class="pagination" id="pagination"></div>
-            </div>
+        <div class="device-body">
+          <div class="data-row"><span class="label">Suhu</span><span class="value green-val" id="liveTemp">28.4°C</span></div>
+          <div class="data-row"><span class="label">Kelembapan</span><span class="value green-val" id="liveHumid">67.2%</span></div>
+          <div class="data-row"><span class="label">Gas MQ135</span><span class="value" id="liveGas">312 PPM</span></div>
+          <div class="data-row"><span class="label">PIR</span><span class="value yellow-val" id="livePir">Kosong</span></div>
+          <div class="data-row"><span class="label">Status</span><span class="value green-val blink" id="liveStatus">● NORMAL</span></div>
+          <div class="data-row"><span class="label">Spray</span><span class="value small-val" id="liveSpray">dalam 284 menit</span></div>
         </div>
-    </main>
+      </div>
+    </div>
+  </section>
 
-    <!-- Chatbot Button -->
-    <button class="chatbot-btn" id="chatbotBtn">
-        <i class="fas fa-comments"></i>
-        <span class="chatbot-badge">?</span>
-    </button>
+  <!-- FITUR -->
+  <section id="fitur">
+    <div class="section-label">Keunggulan Sistem</div>
+    <h2 class="section-title">Fitur Utama</h2>
+    <div class="features-grid">
+      <div class="feature-card" data-delay="0">
+        <div class="feature-icon">🌡️</div>
+        <h3>Monitoring Suhu & Kelembapan</h3>
+        <p>Sensor DHT22 memantau kondisi lingkungan gudang secara real-time setiap 2 detik.</p>
+      </div>
+      <div class="feature-card" data-delay="100">
+        <div class="feature-icon">🔥</div>
+        <h3>Deteksi Api & Gas</h3>
+        <p>Sensor api dan MQ135 mendeteksi bahaya kebakaran dan kualitas udara buruk secara otomatis.</p>
+      </div>
+      <div class="feature-card" data-delay="200">
+        <div class="feature-icon">👁️</div>
+        <h3>Keamanan PIR</h3>
+        <p>Sensor gerak PIR mendeteksi kehadiran orang di dalam gudang dan mengirim notifikasi.</p>
+      </div>
+      <div class="feature-card" data-delay="300">
+        <div class="feature-icon">📦</div>
+        <h3>Monitor Box Penyimpanan</h3>
+        <p>Sensor ultrasonik mengukur kapasitas penyimpanan dan memberi peringatan saat penuh.</p>
+      </div>
+      <div class="feature-card" data-delay="400">
+        <div class="feature-icon">🌿</div>
+        <h3>Smart Spray Reminder</h3>
+        <p>Pengingat otomatis jadwal penyemprotan alami serai dan neem oil berdasarkan kondisi udara.</p>
+      </div>
+      <div class="feature-card" data-delay="500">
+        <div class="feature-icon">🤖</div>
+        <h3>AI Chatbot Hama</h3>
+        <p>Asisten AI siap menjawab pertanyaan seputar pengendalian hama dan penggunaan pestisida alami.</p>
+      </div>
+    </div>
+  </section>
 
-    <!-- Chatbot Modal -->
-    <div class="chatbot-modal" id="chatbotModal">
-        <div class="chatbot-header">
-            <div class="chatbot-title">
-                <i class="fas fa-bug"></i>
-                <span>Asisten Hama & Spray</span>
-            </div>
-            <button class="chatbot-close" id="chatbotClose">
-                <i class="fas fa-times"></i>
-            </button>
+  <!-- HAMA SECTION -->
+  <section id="hama">
+    <div class="section-label">Panduan Lengkap</div>
+    <h2 class="section-title">Menghindari & Mengendalikan Hama</h2>
+    <div class="hama-grid">
+
+      <div class="hama-card">
+        <div class="hama-icon">🐀</div>
+        <h3>Tikus</h3>
+        <ul>
+          <li>Tutup semua celah masuk > 0.5 cm</li>
+          <li>Simpan hasil panen dalam wadah tertutup rapat</li>
+          <li>Pasang perangkap ultrasonik di sudut gudang</li>
+          <li>Tanam tanaman pengusir (mint, lavender) di sekitar gudang</li>
+        </ul>
+        <div class="hama-tag">Risiko: Tinggi</div>
+      </div>
+
+      <div class="hama-card">
+        <div class="hama-icon">🪲</div>
+        <h3>Kumbang & Serangga</h3>
+        <ul>
+          <li>Jaga kelembapan gudang 50–65% (tidak terlalu lembap)</li>
+          <li>Gunakan lampu UV perangkap serangga malam hari</li>
+          <li>Semprot serai secara rutin tiap 5 jam</li>
+          <li>Bersihkan sisa-sisa biji/produk yang berserakan</li>
+        </ul>
+        <div class="hama-tag warning">Risiko: Sedang</div>
+      </div>
+
+      <div class="hama-card">
+        <div class="hama-icon">🍄</div>
+        <h3>Jamur & Kapang</h3>
+        <ul>
+          <li>Pastikan ventilasi udara cukup lancar</li>
+          <li>Kelembapan dijaga di bawah 70%</li>
+          <li>Gunakan silica gel atau dehumidifier</li>
+          <li>Periksa kondisi rutin tiap minggu</li>
+        </ul>
+        <div class="hama-tag warning">Risiko: Sedang</div>
+      </div>
+
+      <div class="hama-card">
+        <div class="hama-icon">🐛</div>
+        <h3>Ulat & Larva</h3>
+        <ul>
+          <li>Gunakan jaring halus pada ventilasi</li>
+          <li>Semprot neem oil (minyak mimba) tiap 3 hari</li>
+          <li>Periksa kemasan produk secara berkala</li>
+          <li>Hindari menumpuk produk terlalu padat</li>
+        </ul>
+        <div class="hama-tag low">Risiko: Rendah</div>
+      </div>
+
+    </div>
+    <div class="hama-tips">
+      <div class="tips-icon">💡</div>
+      <div>
+        <strong>Tips Umum Gudang Bersih:</strong>
+        Jaga suhu gudang di bawah 28°C, bersihkan lantai setiap hari, lakukan fumigasi alami tiap bulan, dan pantau sensor IoT secara aktif untuk deteksi dini.
+      </div>
+    </div>
+  </section>
+
+  <!-- SERAI SECTION -->
+  <section id="serai">
+    <div class="serai-bg-deco"></div>
+    <div class="section-label">Pestisida Alami</div>
+    <h2 class="section-title">Panduan Semprot Ekstrak Serai</h2>
+    <div class="serai-layout">
+      <div class="serai-steps">
+
+        <div class="step">
+          <div class="step-num">01</div>
+          <div class="step-content">
+            <h3>Persiapan Bahan</h3>
+            <p>Siapkan 200g batang serai segar, 1 liter air bersih, dan 5ml sabun cuci cair sebagai emulsifier alami.</p>
+          </div>
         </div>
-        <div class="chatbot-body" id="chatbotBody">
-            <div class="chat-message bot">
-                <div class="message-avatar">
-                    <i class="fas fa-robot"></i>
-                </div>
-                <div class="message-content">
-                    <p>Halo! 👋 Saya asisten Smart Eco Farm. Tanya saya tentang:</p>
-                    <ul>
-                        <li>🐛 Cara mengatasi hama tanaman</li>
-                        <li>🌿 Manfaat ekstrak sereh & neem</li>
-                        <li>💧 Cara membuat spray alami</li>
-                        <li>🌱 Tips pencegahan hama</li>
-                        <li>🚶 Sensor PIR & deteksi gerakan</li>
-                    </ul>
-                </div>
-            </div>
+
+        <div class="step">
+          <div class="step-num">02</div>
+          <div class="step-content">
+            <h3>Proses Ekstraksi</h3>
+            <p>Rebus serai selama 15 menit hingga air berubah kuning kehijauan. Dinginkan hingga suhu ruangan, lalu saring menggunakan kain kasa.</p>
+          </div>
         </div>
-        <div class="chatbot-suggestions" id="chatbotSuggestions">
-            <button class="suggestion-btn" data-question="Bagaimana cara membuat spray ekstrak sereh?">
-                🌿 Cara buat spray sereh
-            </button>
-            <button class="suggestion-btn" data-question="Apa manfaat neem oil untuk tanaman?">
-                🍃 Manfaat neem oil
-            </button>
-            <button class="suggestion-btn" data-question="Bagaimana mencegah hama di gudang penyimpanan?">
-                🐜 Cegah hama gudang
-            </button>
-            <button class="suggestion-btn" data-question="Kapan waktu terbaik penyemprotan?">
-                ⏰ Waktu semprot
-            </button>
-            <button class="suggestion-btn" data-question="Apa itu sensor PIR dan fungsinya?">
-                🚶 Sensor PIR
-            </button>
+
+        <div class="step">
+          <div class="step-num">03</div>
+          <div class="step-content">
+            <h3>Pengenceran & Mixing</h3>
+            <p>Campurkan 500ml ekstrak serai dengan 500ml air bersih. Tambahkan 5ml sabun cair, aduk merata. Masukkan ke botol semprot 1 liter.</p>
+          </div>
         </div>
-        <div class="chatbot-input">
-            <input type="text" id="chatInput" placeholder="Tanya tentang hama atau spray alami...">
-            <button id="chatSendBtn">
-                <i class="fas fa-paper-plane"></i>
-            </button>
+
+        <div class="step">
+          <div class="step-num">04</div>
+          <div class="step-content">
+            <h3>Teknik Penyemprotan</h3>
+            <p>Semprot di sudut-sudut gudang, ventilasi, dan area penyimpanan. Jarak semprot 20–30cm. Hindari menyemprot langsung ke produk pangan.</p>
+          </div>
         </div>
+
+        <div class="step">
+          <div class="step-num">05</div>
+          <div class="step-content">
+            <h3>Jadwal & Frekuensi</h3>
+            <p>Semprot setiap <strong>5 jam</strong> dalam kondisi normal. Jika kelembapan >80%, percepat menjadi setiap <strong>3 jam</strong>. Sensor IoT akan mengingatkan otomatis.</p>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-num">06</div>
+          <div class="step-content">
+            <h3>Penyimpanan Larutan</h3>
+            <p>Simpan sisa larutan di tempat sejuk dan gelap. Maksimal bertahan <strong>3 hari</strong> sebelum efektivitasnya berkurang. Buat ulang jika berbau asam.</p>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="serai-info">
+        <div class="info-card">
+          <h3>🌿 Kandungan Aktif Serai</h3>
+          <div class="compound-list">
+            <div class="compound"><span>Citronellal</span><div class="bar"><div class="bar-fill" style="width:85%"></div></div><span>85%</span></div>
+            <div class="compound"><span>Geraniol</span><div class="bar"><div class="bar-fill" style="width:60%"></div></div><span>60%</span></div>
+            <div class="compound"><span>Limonene</span><div class="bar"><div class="bar-fill" style="width:45%"></div></div><span>45%</span></div>
+            <div class="compound"><span>Linalool</span><div class="bar"><div class="bar-fill" style="width:30%"></div></div><span>30%</span></div>
+          </div>
+        </div>
+        <div class="info-card">
+          <h3>⚠️ Hama yang Diusir</h3>
+          <div class="pest-tags">
+            <span class="pest-tag">Nyamuk</span>
+            <span class="pest-tag">Lalat</span>
+            <span class="pest-tag">Semut</span>
+            <span class="pest-tag">Kecoa</span>
+            <span class="pest-tag">Ngengat</span>
+            <span class="pest-tag">Kutu daun</span>
+            <span class="pest-tag">Thrips</span>
+          </div>
+        </div>
+        <div class="info-card">
+          <h3>✅ Keunggulan vs Kimia</h3>
+          <ul class="advantage-list">
+            <li>Ramah lingkungan & biodegradable</li>
+            <li>Tidak beracun untuk manusia & hewan</li>
+            <li>Tidak meninggalkan residu kimia</li>
+            <li>Biaya produksi sangat rendah</li>
+            <li>Mudah dibuat sendiri</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SENSOR STATUS -->
+  <section id="sensor">
+    <div class="section-label">IoT Dashboard</div>
+    <h2 class="section-title">Status Sensor Real-time</h2>
+    <div class="sensor-grid">
+      <div class="sensor-card" id="sc-temp">
+        <div class="sensor-icon">🌡️</div>
+        <div class="sensor-label">Suhu</div>
+        <div class="sensor-value" id="s-temp">28.4°C</div>
+        <div class="sensor-status ok">Normal</div>
+      </div>
+      <div class="sensor-card" id="sc-humid">
+        <div class="sensor-icon">💧</div>
+        <div class="sensor-label">Kelembapan</div>
+        <div class="sensor-value" id="s-humid">67.2%</div>
+        <div class="sensor-status ok">Normal</div>
+      </div>
+      <div class="sensor-card" id="sc-gas">
+        <div class="sensor-icon">💨</div>
+        <div class="sensor-label">Kualitas Udara</div>
+        <div class="sensor-value" id="s-gas">312 PPM</div>
+        <div class="sensor-status ok">Baik</div>
+      </div>
+      <div class="sensor-card" id="sc-fire">
+        <div class="sensor-icon">🔥</div>
+        <div class="sensor-label">Sensor Api</div>
+        <div class="sensor-value" id="s-fire">1240</div>
+        <div class="sensor-status ok">Aman</div>
+      </div>
+      <div class="sensor-card" id="sc-pir">
+        <div class="sensor-icon">👁️</div>
+        <div class="sensor-label">PIR Motion</div>
+        <div class="sensor-value" id="s-pir">Kosong</div>
+        <div class="sensor-status ok">Aman</div>
+      </div>
+      <div class="sensor-card" id="sc-box">
+        <div class="sensor-icon">📦</div>
+        <div class="sensor-label">Box Storage</div>
+        <div class="sensor-value" id="s-box">42.3 cm</div>
+        <div class="sensor-status ok">Normal</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-logo">🌿 Smart<b>Eco</b>Farm</div>
+    <p>Sistem Monitoring Gudang Pertanian Cerdas berbasis ESP32 + MQTT + AI</p>
+    <p class="footer-copy">© 2025 SmartEcoFarm — Dibuat untuk petani Indonesia</p>
+  </footer>
+
+  <!-- CHATBOT -->
+  <div class="chat-bubble" id="chatBubble" title="Tanya AI">💬</div>
+
+  <div class="chat-window" id="chatWindow">
+    <div class="chat-header">
+      <div class="chat-header-info">
+        <div class="chat-avatar">🌿</div>
+        <div>
+          <div class="chat-name">EcoBot</div>
+          <div class="chat-status-dot">● Online</div>
+        </div>
+      </div>
+      <button class="chat-close" id="closeChat">✕</button>
     </div>
 
-    <!-- Footer -->
-    <footer class="footer">
-        <div class="container">
-            <p>&copy; 2026 Smart Eco Farm - Monitoring Gudang Penyimpanan Tanaman</p>
+    <div class="chat-messages" id="chatMessages">
+      <div class="msg bot">
+        <div class="msg-bubble">
+          Halo! Saya <strong>EcoBot</strong> 🌿 — asisten pertanian cerdas. Saya siap membantu kamu tentang:
+          <ul>
+            <li>🐀 Mengendalikan hama di gudang</li>
+            <li>🌿 Cara membuat & menggunakan semprot serai</li>
+            <li>📊 Interpretasi data sensor</li>
+            <li>💡 Tips pertanian organik</li>
+          </ul>
+          Silakan tanya apa saja!
         </div>
-    </footer>
-<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-    <script src="script.js"></script>
+      </div>
+    </div>
+
+    <div class="chat-suggestions">
+      <button class="suggest-btn" data-q="Bagaimana cara mengusir tikus dari gudang secara alami?">🐀 Usir tikus</button>
+      <button class="suggest-btn" data-q="Berikan panduan lengkap membuat semprot ekstrak serai untuk gudang pertanian">🌿 Buat semprot serai</button>
+      <button class="suggest-btn" data-q="Kelembapan gudang 85%, apa yang harus dilakukan?">💧 Kelembapan tinggi</button>
+      <button class="suggest-btn" data-q="Apa saja hama berbahaya di gudang beras dan cara mengatasinya?">🌾 Hama gudang beras</button>
+    </div>
+
+    <div class="chat-input-area">
+      <input type="text" id="chatInput" placeholder="Tanya soal hama atau semprot serai..." />
+      <button id="sendBtn">➤</button>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
 </body>
 </html>
