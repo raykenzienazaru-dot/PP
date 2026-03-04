@@ -1,67 +1,158 @@
 // ================================================
 // SMARTFARM MONITORING - COMBINED SCRIPT (FIXED)
 // MQTT + Charts + Chatbot + Main App
+// Disesuaikan dengan firmware Arduino ESP32
 // ================================================
 
-let mqttClient = null;
+let mqttClient  = null;
 let isConnected = false;
 let historyData = [];
-let latestData = null;
+let latestData  = null;
+let brokerIndex = 0;
 
-const MQTT_CONFIG = {
-    broker: 'wss://we141ff2.ala.asia-southeast1.emqxsl.com:8084/mqtt',
-    options: {
+const MQTT_HOST  = 'we141ff2.ala.asia-southeast1.emqxsl.com';
+const MQTT_TOPIC = 'smartfarm/monitoring';
+
+// Coba WSS 8084 dulu, fallback ke WS 8083
+const BROKER_CANDIDATES = [
+    'wss://' + MQTT_HOST + ':8084/mqtt',
+    'ws://'  + MQTT_HOST + ':8083/mqtt'
+];
+
+// ================================================
+// THRESHOLD — HARUS SINKRON DENGAN ARDUINO
+// ================================================
+// #define SUHU_PANAS        32.0
+// #define KELEMBAPAN_KERING 40.0
+// #define FIRE_THRESHOLD    3000
+// #define GAS_PPM_THRESHOLD 400.0
+// #define DISTANCE_FULL     5
+
+const THRESHOLD = {
+    SUHU_PANAS:        32.0,
+    KELEMBAPAN_KERING: 40.0,
+    KELEMBAPAN_LEMBAP: 80.0,
+    FIRE_THRESHOLD:    3000,
+    GAS_PPM_THRESHOLD: 400.0,
+    DISTANCE_FULL:     5
+};
+
+// ================================================
+// STATUS CODES — HARUS SINKRON DENGAN ARDUINO
+// Arduino mengirim: NORMAL | KEBAKARAN | TERLALU_PANAS |
+//                   GAS_BERBAHAYA | KERING | TERLALU_LEMBAP
+// ================================================
+const STATUS_LEVEL = {
+    'KEBAKARAN':     'danger',
+    'TERLALU_PANAS': 'warning',
+    'GAS_BERBAHAYA': 'warning',
+    'KERING':        'warning',
+    'TERLALU_LEMBAP':'warning',
+    'NORMAL':        'normal'
+};
+
+const STATUS_ICON = {
+    'KEBAKARAN':     'fas fa-fire',
+    'TERLALU_PANAS': 'fas fa-thermometer-full',
+    'GAS_BERBAHAYA': 'fas fa-smog',
+    'KERING':        'fas fa-tint-slash',
+    'TERLALU_LEMBAP':'fas fa-water',
+    'NORMAL':        'fas fa-check-circle'
+};
+
+// ================================================
+// MQTT CONNECTION WITH AUTO-FALLBACK
+// ================================================
+
+function initMQTT() { tryConnect(0); }
+
+function tryConnect(idx) {
+    if (idx >= BROKER_CANDIDATES.length) {
+        console.error('Semua broker gagal. Cek port EMQX di dashboard.');
+        updateConnectionStatus('disconnected');
+        return;
+    }
+
+    const broker = BROKER_CANDIDATES[idx];
+    console.log('Mencoba koneksi ke:', broker);
+    updateConnectionStatus('connecting');
+
+    const options = {
         clientId: 'webapp_' + Math.random().toString(16).substr(2, 8),
         username: 'PP123',
         password: '12345',
-        reconnectPeriod: 5000,
-        clean: true
-    },
-    topic: 'smartfarm/monitoring'
-};
-
-function initMQTT() {
-    console.log('Menghubungkan ke MQTT...');
-    updateConnectionStatus('connecting');
+        clean: true,
+        reconnectPeriod: 0,
+        connectTimeout: 8000
+    };
 
     try {
-        mqttClient = mqtt.connect(MQTT_CONFIG.broker, MQTT_CONFIG.options);
+        if (mqttClient) { mqttClient.end(true); mqttClient = null; }
+        mqttClient = mqtt.connect(broker, options);
+
+        const timeoutId = setTimeout(() => {
+            if (!isConnected) {
+                console.warn('Timeout di ' + broker + ', coba berikutnya...');
+                mqttClient.end(true);
+                tryConnect(idx + 1);
+            }
+        }, 10000);
 
         mqttClient.on('connect', () => {
-            console.log('MQTT Terhubung!');
+            clearTimeout(timeoutId);
+            console.log('MQTT Terhubung via:', broker);
             isConnected = true;
+            brokerIndex = idx;
             updateConnectionStatus('connected');
-            mqttClient.subscribe(MQTT_CONFIG.topic, (err) => {
+            mqttClient.subscribe(MQTT_TOPIC, (err) => {
                 if (err) console.error('Gagal subscribe:', err);
-                else console.log('Subscribe ke topic:', MQTT_CONFIG.topic);
+                else     console.log('Subscribe ke topic:', MQTT_TOPIC);
             });
         });
 
         mqttClient.on('message', (topic, message) => {
-            if (topic === MQTT_CONFIG.topic) handleMQTTMessage(message.toString());
+            if (topic === MQTT_TOPIC) handleMQTTMessage(message.toString());
         });
 
         mqttClient.on('error', (err) => {
-            console.error('MQTT Error:', err);
+            clearTimeout(timeoutId);
+            console.warn('Error di ' + broker + ':', err.message || err);
             updateConnectionStatus('disconnected');
+            setTimeout(() => tryConnect(idx + 1), 1000);
         });
 
         mqttClient.on('close', () => {
-            console.log('MQTT Terputus');
-            isConnected = false;
-            updateConnectionStatus('disconnected');
+            if (isConnected) {
+                console.log('MQTT Terputus, reconnect 5 detik...');
+                isConnected = false;
+                updateConnectionStatus('disconnected');
+                setTimeout(() => tryConnect(brokerIndex), 5000);
+            }
         });
 
-        mqttClient.on('reconnect', () => {
-            console.log('Mencoba reconnect...');
-            updateConnectionStatus('connecting');
-        });
+        mqttClient.on('reconnect', () => updateConnectionStatus('connecting'));
 
     } catch (error) {
         console.error('Error inisialisasi MQTT:', error);
-        updateConnectionStatus('disconnected');
+        setTimeout(() => tryConnect(idx + 1), 1000);
     }
 }
+
+// ================================================
+// MQTT MESSAGE HANDLER
+// Arduino payload format:
+// {
+//   "suhu": float,
+//   "kelembapan": float,
+//   "gas_ppm": float,   <-- BUKAN "gas", ini PPM hasil konversi MQ135
+//   "api": int,         <-- nilai analog raw 0-4095 dari fire sensor
+//   "jarak": float|null,
+//   "pir": bool,
+//   "status": string,   <-- kode status (NORMAL/KEBAKARAN/dll)
+//   "keterangan": string,
+//   "spray": string
+// }
+// ================================================
 
 function handleMQTTMessage(rawMessage) {
     try {
@@ -72,12 +163,16 @@ function handleMQTTMessage(rawMessage) {
         data.timestamp  = new Date().getTime();
         data.suhu       = sanitizeSensorValue(data.suhu);
         data.kelembapan = sanitizeSensorValue(data.kelembapan);
-        data.gas        = sanitizeSensorValue(data.gas);
-        data.api        = sanitizeSensorValue(data.api);
-        data.jarak      = sanitizeSensorValue(data.jarak);
-        // cahaya sengaja tidak diproses lagi
 
-        // FIX PIR: Arduino kirim boolean true/false, konversi ke 0/1
+        // Arduino kirim "gas_ppm" (float PPM), simpan ke data.gas_ppm
+        // Juga pertahankan data.gas untuk backward-compat jika ada payload lama
+        data.gas_ppm    = sanitizeSensorValue(data.gas_ppm);
+        data.gas        = sanitizeSensorValue(data.gas);        // legacy / raw analog (opsional)
+
+        data.api        = sanitizeSensorValue(data.api);        // raw analog 0-4095
+        data.jarak      = sanitizeSensorValue(data.jarak);
+
+        // PIR: Arduino kirim boolean true/false -> konversi ke 0/1
         if (data.pir !== undefined && data.pir !== null) {
             if (typeof data.pir === 'boolean')     data.pir = data.pir ? 1 : 0;
             else if (typeof data.pir === 'string') data.pir = (data.pir === 'true' || data.pir === '1') ? 1 : 0;
@@ -87,7 +182,6 @@ function handleMQTTMessage(rawMessage) {
         }
 
         latestData = data;
-
         updateSensorCards(data);
         updateStatusBanner(data);
         updateSprayReminder(data);
@@ -95,45 +189,43 @@ function handleMQTTMessage(rawMessage) {
         updateCharts(data);
 
     } catch (error) {
-        console.error('Error parsing MQTT message:', error);
-        console.error('Raw message was:', rawMessage);
+        console.error('Error parsing MQTT message:', error, rawMessage);
     }
 }
 
 function sanitizeSensorValue(val) {
     if (val === undefined || val === null) return undefined;
     const num = Number(val);
-    if (isNaN(num)) return undefined;
-    return num;
+    return isNaN(num) ? undefined : num;
 }
+
+// ================================================
+// UI UPDATES
+// ================================================
 
 function updateConnectionStatus(status) {
     const statusEl = document.getElementById('connectionStatus');
     if (!statusEl) return;
     const statusIcon = statusEl.querySelector('i');
     const statusText = statusEl.querySelector('span');
-
     statusEl.classList.remove('connected', 'disconnected');
-
     switch (status) {
         case 'connected':
             statusEl.classList.add('connected');
             statusIcon.className = 'fas fa-wifi';
-            statusText.textContent = 'Terhubung';
-            break;
+            statusText.textContent = 'Terhubung'; break;
         case 'connecting':
             statusIcon.className = 'fas fa-spinner fa-spin';
-            statusText.textContent = 'Menghubungkan...';
-            break;
+            statusText.textContent = 'Menghubungkan...'; break;
         case 'disconnected':
             statusEl.classList.add('disconnected');
             statusIcon.className = 'fas fa-wifi';
-            statusText.textContent = 'Terputus';
-            break;
+            statusText.textContent = 'Terputus'; break;
     }
 }
 
 function updateSensorCards(data) {
+    // Suhu & Kelembapan
     if (data.suhu !== undefined) {
         const el = document.getElementById('suhuValue');
         if (el) el.textContent = data.suhu.toFixed(1);
@@ -142,28 +234,59 @@ function updateSensorCards(data) {
         const el = document.getElementById('kelembapanValue');
         if (el) el.textContent = data.kelembapan.toFixed(1);
     }
-    if (data.gas !== undefined) {
+
+    // Gas: tampilkan gas_ppm (PPM) jika ada, fallback ke gas (raw analog)
+    const gasDisplay = data.gas_ppm !== undefined ? data.gas_ppm : data.gas;
+    if (gasDisplay !== undefined) {
         const el = document.getElementById('gasValue');
-        if (el) el.textContent = Math.round(data.gas);
+        if (el) {
+            // Tampilkan 1 desimal jika PPM, integer jika raw analog
+            el.textContent = data.gas_ppm !== undefined
+                ? data.gas_ppm.toFixed(1)
+                : Math.round(gasDisplay);
+        }
+        // Ubah label satuan jika ada elemennya
+        const unitEl = document.getElementById('gasUnit');
+        if (unitEl) unitEl.textContent = data.gas_ppm !== undefined ? 'PPM' : 'analog';
     }
+
+    // Api (raw analog 0–4095)
     if (data.api !== undefined) {
         const el = document.getElementById('apiValue');
         if (el) el.textContent = Math.round(data.api);
     }
+
+    // Jarak (cm) — null jika sensor error (distance = 999 dari Arduino)
     if (data.jarak !== undefined) {
         const el = document.getElementById('jarakValue');
-        if (el) el.textContent = data.jarak > 0 ? data.jarak.toFixed(1) : '--';
+        if (el) {
+            // Arduino kirim 999 saat sensor error
+            el.textContent = (data.jarak > 0 && data.jarak < 999) ? data.jarak.toFixed(1) : '--';
+        }
+        // Indikator status box penyimpanan
+        const boxStatusEl = document.getElementById('boxStatus');
+        if (boxStatusEl) {
+            if (data.jarak === 999 || data.jarak <= 0) {
+                boxStatusEl.textContent = 'Sensor error';
+                boxStatusEl.className = 'box-status warning';
+            } else if (data.jarak < THRESHOLD.DISTANCE_FULL) {
+                boxStatusEl.textContent = 'PENUH - Segera kosongkan!';
+                boxStatusEl.className = 'box-status danger';
+            } else {
+                boxStatusEl.textContent = 'Normal';
+                boxStatusEl.className = 'box-status normal';
+            }
+        }
     }
 
     // PIR
     const pirEl    = document.getElementById('pirValue');
     const pirBadge = document.getElementById('pirBadge');
     const pirCard  = document.getElementById('pirCard');
-
     if (pirEl)    pirEl.textContent = data.pir === 1 ? 'ADA' : 'AMAN';
     if (pirBadge) {
-        pirBadge.textContent = data.pir === 1 ? '⚠ Gerakan!' : '✔ Kosong';
-        pirBadge.className   = 'pir-badge ' + (data.pir === 1 ? 'pir-alert' : 'pir-safe');
+        pirBadge.textContent = data.pir === 1 ? 'Gerakan!' : 'Kosong';
+        pirBadge.className = 'pir-badge ' + (data.pir === 1 ? 'pir-alert' : 'pir-safe');
     }
     if (pirCard) pirCard.classList.toggle('pir-active', data.pir === 1);
 }
@@ -171,53 +294,61 @@ function updateSensorCards(data) {
 function updateStatusBanner(data) {
     const banner = document.getElementById('statusBanner');
     if (!banner) return;
-    const icon        = banner.querySelector('.status-icon i');
-    const title       = document.getElementById('statusTitle');
-    const description = document.getElementById('statusDescription');
+    const icon  = banner.querySelector('.status-icon i');
+    const title = document.getElementById('statusTitle');
+    const desc  = document.getElementById('statusDescription');
 
+    // Reset class
     banner.classList.remove('danger', 'warning');
 
     if (data.status) {
-        const statusClean = data.status.replace(/[^\x00-\x7F]/g, '').trim().toUpperCase();
-        title.textContent = data.status;
+        const statusCode = data.status.trim().toUpperCase();
 
-        if (statusClean.includes('KEBAKARAN') || statusClean.includes('BAHAYA')) {
-            banner.classList.add('danger');
-            if (icon) icon.className = 'fas fa-exclamation-triangle';
-        } else if (
-            statusClean.includes('PANAS') ||
-            statusClean.includes('KERING') ||
-            statusClean.includes('GAS') ||
-            statusClean.includes('LEMBAP') ||
-            statusClean.includes('LEMBAB') ||
-            statusClean.includes('ZAT')
-        ) {
-            banner.classList.add('warning');
-            if (icon) icon.className = 'fas fa-exclamation-circle';
-        } else {
-            if (icon) icon.className = 'fas fa-check-circle';
-        }
-    }
+        // Set level (danger/warning/normal) berdasarkan kode status Arduino
+        const level = STATUS_LEVEL[statusCode] || 'normal';
+        if (level === 'danger')  banner.classList.add('danger');
+        if (level === 'warning') banner.classList.add('warning');
 
-    if (description) {
-        description.textContent = data.keterangan || getKeteranganFromStatus(data.status);
+        // Set icon
+        if (icon) icon.className = STATUS_ICON[statusCode] || 'fas fa-info-circle';
+
+        // Set judul — gunakan label manusia-friendly
+        if (title) title.textContent = getStatusLabel(statusCode);
+
+        // Set deskripsi — pakai keterangan dari Arduino jika ada, fallback ke lokal
+        if (desc) desc.textContent = data.keterangan || getKeteranganFromStatus(statusCode);
     }
 }
 
-function getKeteranganFromStatus(status) {
-    if (!status) return 'Sistem monitoring aktif';
-    const s = status.replace(/[^\x00-\x7F]/g, '').trim().toUpperCase();
-    if (s.includes('KEBAKARAN')) return 'Api + Gas + Suhu tinggi terdeteksi!';
-    if (s.includes('PANAS'))     return 'Cahaya terik & suhu naik, berisiko memicu api!';
-    if (s.includes('GAS') || s.includes('ZAT')) return 'Kualitas udara buruk, segera buka jendela gudang';
-    if (s.includes('KERING'))    return 'Tanaman bisa kering, aktifkan penyemprot air!';
-    if (s.includes('LEMBAP') || s.includes('LEMBAB')) return 'Berisiko jamur & hama';
-    return 'Sistem monitoring aktif';
+// Label tampilan untuk setiap kode status Arduino
+function getStatusLabel(statusCode) {
+    const labels = {
+        'NORMAL':        'Kondisi Normal',
+        'KEBAKARAN':     'BAHAYA KEBAKARAN!',
+        'TERLALU_PANAS': 'Suhu Terlalu Panas',
+        'GAS_BERBAHAYA': 'Gas Berbahaya Terdeteksi',
+        'KERING':        'Kelembapan Terlalu Kering',
+        'TERLALU_LEMBAP':'Kelembapan Terlalu Lembap'
+    };
+    return labels[statusCode] || statusCode;
+}
+
+// Keterangan fallback jika Arduino tidak mengirim field "keterangan"
+function getKeteranganFromStatus(statusCode) {
+    const ket = {
+        'NORMAL':        'Sistem monitoring aktif, semua kondisi aman.',
+        'KEBAKARAN':     'Api, gas, dan suhu tinggi terdeteksi bersamaan!',
+        'TERLALU_PANAS': 'Suhu > ' + THRESHOLD.SUHU_PANAS + '°C, berisiko memicu api!',
+        'GAS_BERBAHAYA': 'Gas > ' + THRESHOLD.GAS_PPM_THRESHOLD + ' PPM, segera buka jendela gudang!',
+        'KERING':        'Kelembapan < ' + THRESHOLD.KELEMBAPAN_KERING + '%, tanaman bisa kering, aktifkan penyemprot!',
+        'TERLALU_LEMBAP':'Kelembapan > ' + THRESHOLD.KELEMBAPAN_LEMBAP + '%, berisiko jamur dan hama!'
+    };
+    return ket[statusCode] || 'Sistem monitoring aktif.';
 }
 
 function updateSprayReminder(data) {
-    const sprayEl = document.getElementById('sprayStatus');
-    if (sprayEl && data.spray) sprayEl.textContent = data.spray;
+    const el = document.getElementById('sprayStatus');
+    if (el && data.spray) el.textContent = data.spray;
 }
 
 // ================================================
@@ -225,59 +356,44 @@ function updateSprayReminder(data) {
 // ================================================
 
 function addToHistory(data) {
-    const historyEntry = {
-        timestamp:   data.timestamp,
-        suhu:        data.suhu,
-        kelembapan:  data.kelembapan,
-        gas:         data.gas,
-        api:         data.api,
-        jarak:       data.jarak,
-        pir:         data.pir,
-        // cahaya dihapus
-        status:      data.status
-    };
-
-    historyData.unshift(historyEntry);
+    historyData.unshift({
+        timestamp:  data.timestamp,
+        suhu:       data.suhu,
+        kelembapan: data.kelembapan,
+        gas_ppm:    data.gas_ppm,   // PPM dari MQ135
+        gas:        data.gas,       // raw analog (legacy)
+        api:        data.api,
+        jarak:      data.jarak,
+        pir:        data.pir,
+        status:     data.status
+    });
     if (historyData.length > 100) historyData = historyData.slice(0, 100);
-
     saveHistoryToLocalStorage();
     refreshHistoryTable();
 }
 
 function saveHistoryToLocalStorage() {
-    try {
-        localStorage.setItem('smartfarm_history', JSON.stringify(historyData));
-    } catch (error) {
-        console.error('Error saving to localStorage:', error);
-    }
+    try { localStorage.setItem('smartfarm_history', JSON.stringify(historyData)); }
+    catch (e) { console.error('Error saving localStorage:', e); }
 }
 
 function loadHistoryFromLocalStorage() {
     try {
         const saved = localStorage.getItem('smartfarm_history');
         if (saved) {
-            const parsed = JSON.parse(saved);
-            historyData = parsed.map(entry => {
-                if (entry.pir !== undefined && typeof entry.pir === 'boolean') {
-                    entry.pir = entry.pir ? 1 : 0;
-                }
+            historyData = JSON.parse(saved).map(entry => {
+                if (typeof entry.pir === 'boolean') entry.pir = entry.pir ? 1 : 0;
+                // Migrasi entri lama: jika ada gas (raw) tapi tidak ada gas_ppm, pertahankan
                 return entry;
             });
             console.log('Loaded ' + historyData.length + ' history entries');
         }
-    } catch (error) {
-        console.error('Error loading from localStorage:', error);
-        historyData = [];
-    }
+    } catch (e) { console.error('Error loading localStorage:', e); historyData = []; }
 }
 
 function clearHistory() {
     if (confirm('Apakah Anda yakin ingin menghapus semua history?')) {
-        historyData = [];
-        saveHistoryToLocalStorage();
-        currentPage = 1;
-        refreshHistoryTable();
-        resetChartData();
+        historyData = []; saveHistoryToLocalStorage(); currentPage = 1; refreshHistoryTable(); resetChartData();
         alert('History berhasil dihapus!');
     }
 }
@@ -285,70 +401,47 @@ function clearHistory() {
 function getLatestData()  { return latestData; }
 function getHistoryData() { return historyData; }
 
-
 // ================================================
 // CHART.JS
+// Chart 1: Suhu & Kelembapan
+// Chart 2: Gas PPM & Api (raw analog)
 // ================================================
 
 let tempHumChart = null;
 let gasFireChart = null;
-
-const chartData = {
-    labels:     [],
-    suhu:       [],
-    kelembapan: [],
-    gas:        [],
-    api:        []
-};
-
+const chartData = { labels: [], suhu: [], kelembapan: [], gas_ppm: [], api: [] };
 const MAX_CHART_POINTS = 20;
 
-function initCharts() {
-    initTempHumChart();
-    initGasFireChart();
-    console.log('Charts initialized');
-}
+function initCharts() { initTempHumChart(); initGasFireChart(); console.log('Charts initialized'); }
 
 function initTempHumChart() {
     const ctx = document.getElementById('tempHumChart');
     if (!ctx) return;
     if (tempHumChart) { tempHumChart.destroy(); tempHumChart = null; }
-
     tempHumChart = new Chart(ctx, {
         type: 'line',
-        data: {
-            labels: chartData.labels,
-            datasets: [
-                {
-                    label: 'Suhu (°C)',
-                    data: chartData.suhu,
-                    borderColor: '#e74c3c',
-                    backgroundColor: 'rgba(231, 76, 60, 0.1)',
-                    borderWidth: 3, tension: 0.4, fill: true,
-                    pointRadius: 4, pointHoverRadius: 6,
-                    pointBackgroundColor: '#e74c3c', pointBorderColor: '#fff', pointBorderWidth: 2
-                },
-                {
-                    label: 'Kelembapan (%)',
-                    data: chartData.kelembapan,
-                    borderColor: '#3498db',
-                    backgroundColor: 'rgba(52, 152, 219, 0.1)',
-                    borderWidth: 3, tension: 0.4, fill: true,
-                    pointRadius: 4, pointHoverRadius: 6,
-                    pointBackgroundColor: '#3498db', pointBorderColor: '#fff', pointBorderWidth: 2
-                }
-            ]
-        },
+        data: { labels: chartData.labels, datasets: [
+            { label: 'Suhu (°C)', data: chartData.suhu, borderColor: '#e74c3c', backgroundColor: 'rgba(231,76,60,0.1)', borderWidth: 3, tension: 0.4, fill: true, pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: '#e74c3c', pointBorderColor: '#fff', pointBorderWidth: 2 },
+            { label: 'Kelembapan (%)', data: chartData.kelembapan, borderColor: '#3498db', backgroundColor: 'rgba(52,152,219,0.1)', borderWidth: 3, tension: 0.4, fill: true, pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: '#3498db', pointBorderColor: '#fff', pointBorderWidth: 2 }
+        ]},
         options: {
             responsive: true, maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
             plugins: {
                 legend: { display: true, position: 'top', labels: { padding: 15, font: { size: 12, family: 'Poppins', weight: '500' }, usePointStyle: true } },
-                tooltip: { enabled: true, backgroundColor: 'rgba(0,0,0,0.8)', padding: 12, cornerRadius: 8, displayColors: true }
+                tooltip: { enabled: true, backgroundColor: 'rgba(0,0,0,0.8)', padding: 12, cornerRadius: 8 },
+                // Garis threshold suhu panas
+                annotation: {
+                    annotations: {
+                        suhuPanas: { type: 'line', yMin: THRESHOLD.SUHU_PANAS, yMax: THRESHOLD.SUHU_PANAS, borderColor: 'rgba(231,76,60,0.5)', borderWidth: 1, borderDash: [6,3], label: { display: true, content: 'Batas Panas (' + THRESHOLD.SUHU_PANAS + '°C)', position: 'end', font: { size: 10 } } },
+                        kelKering: { type: 'line', yMin: THRESHOLD.KELEMBAPAN_KERING, yMax: THRESHOLD.KELEMBAPAN_KERING, borderColor: 'rgba(52,152,219,0.5)', borderWidth: 1, borderDash: [6,3], label: { display: true, content: 'Batas Kering (' + THRESHOLD.KELEMBAPAN_KERING + '%)', position: 'end', font: { size: 10 } } },
+                        kelLembap: { type: 'line', yMin: THRESHOLD.KELEMBAPAN_LEMBAP, yMax: THRESHOLD.KELEMBAPAN_LEMBAP, borderColor: 'rgba(52,100,219,0.5)', borderWidth: 1, borderDash: [6,3], label: { display: true, content: 'Batas Lembap (' + THRESHOLD.KELEMBAPAN_LEMBAP + '%)', position: 'end', font: { size: 10 } } }
+                    }
+                }
             },
             scales: {
                 x: { display: true, grid: { display: false }, ticks: { font: { size: 11 }, maxRotation: 45 } },
-                y: { display: true, beginAtZero: true, min: 0, max: 50, grid: { color: 'rgba(45,122,62,0.1)', borderDash: [5,5] }, ticks: { font: { size: 11 } } }
+                y: { display: true, min: 0, max: 100, grid: { color: 'rgba(45,122,62,0.1)', borderDash: [5,5] }, ticks: { font: { size: 11 } } }
             },
             animation: { duration: 500, easing: 'easeInOutQuart' }
         }
@@ -359,42 +452,37 @@ function initGasFireChart() {
     const ctx = document.getElementById('gasFireChart');
     if (!ctx) return;
     if (gasFireChart) { gasFireChart.destroy(); gasFireChart = null; }
-
     gasFireChart = new Chart(ctx, {
         type: 'line',
-        data: {
-            labels: chartData.labels,
-            datasets: [
-                {
-                    label: 'Gas (analog)',
-                    data: chartData.gas,
-                    borderColor: '#9b59b6',
-                    backgroundColor: 'rgba(155, 89, 182, 0.1)',
-                    borderWidth: 3, tension: 0.4, fill: true,
-                    pointRadius: 4, pointHoverRadius: 6,
-                    pointBackgroundColor: '#9b59b6', pointBorderColor: '#fff', pointBorderWidth: 2
-                },
-                {
-                    label: 'Api (analog)',
-                    data: chartData.api,
-                    borderColor: '#f39c12',
-                    backgroundColor: 'rgba(243, 156, 18, 0.1)',
-                    borderWidth: 3, tension: 0.4, fill: true,
-                    pointRadius: 4, pointHoverRadius: 6,
-                    pointBackgroundColor: '#f39c12', pointBorderColor: '#fff', pointBorderWidth: 2
-                }
-            ]
-        },
+        data: { labels: chartData.labels, datasets: [
+            // gas_ppm — sumbu Y kiri (PPM)
+            { label: 'Gas MQ135 (PPM)', data: chartData.gas_ppm, borderColor: '#9b59b6', backgroundColor: 'rgba(155,89,182,0.1)', borderWidth: 3, tension: 0.4, fill: true, pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: '#9b59b6', pointBorderColor: '#fff', pointBorderWidth: 2, yAxisID: 'yPPM' },
+            // api raw analog — sumbu Y kanan (0-4095)
+            { label: 'Api / Fire Sensor (analog)', data: chartData.api, borderColor: '#f39c12', backgroundColor: 'rgba(243,156,18,0.1)', borderWidth: 3, tension: 0.4, fill: true, pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: '#f39c12', pointBorderColor: '#fff', pointBorderWidth: 2, yAxisID: 'yFire' }
+        ]},
         options: {
             responsive: true, maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
             plugins: {
                 legend: { display: true, position: 'top', labels: { padding: 15, font: { size: 12, family: 'Poppins', weight: '500' }, usePointStyle: true } },
-                tooltip: { enabled: true, backgroundColor: 'rgba(0,0,0,0.8)', padding: 12, cornerRadius: 8, displayColors: true }
+                tooltip: { enabled: true, backgroundColor: 'rgba(0,0,0,0.8)', padding: 12, cornerRadius: 8 }
             },
             scales: {
                 x: { display: true, grid: { display: false }, ticks: { font: { size: 11 }, maxRotation: 45 } },
-                y: { display: true, beginAtZero: true, max: 4095, grid: { color: 'rgba(45,122,62,0.1)', borderDash: [5,5] }, ticks: { font: { size: 11 } } }
+                // Sumbu Y kiri: Gas PPM
+                yPPM: {
+                    type: 'linear', position: 'left', beginAtZero: true,
+                    grid: { color: 'rgba(155,89,182,0.1)', borderDash: [5,5] },
+                    ticks: { font: { size: 11 }, color: '#9b59b6' },
+                    title: { display: true, text: 'Gas (PPM)', color: '#9b59b6', font: { size: 11 } }
+                },
+                // Sumbu Y kanan: Fire sensor analog 0-4095
+                yFire: {
+                    type: 'linear', position: 'right', beginAtZero: true, max: 4095,
+                    grid: { drawOnChartArea: false },
+                    ticks: { font: { size: 11 }, color: '#f39c12' },
+                    title: { display: true, text: 'Api (0-4095)', color: '#f39c12', font: { size: 11 } }
+                }
             },
             animation: { duration: 500, easing: 'easeInOutQuart' }
         }
@@ -404,141 +492,86 @@ function initGasFireChart() {
 function updateCharts(data) {
     if (!data) return;
     const timeLabel = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-
     chartData.labels.push(timeLabel);
-    chartData.suhu.push(data.suhu !== undefined ? data.suhu : null);
-    chartData.kelembapan.push(data.kelembapan !== undefined ? data.kelembapan : null);
-    chartData.gas.push(data.gas !== undefined ? data.gas : null);
-    chartData.api.push(data.api !== undefined ? data.api : null);
+    chartData.suhu.push(data.suhu        != null ? data.suhu        : null);
+    chartData.kelembapan.push(data.kelembapan != null ? data.kelembapan : null);
+    chartData.gas_ppm.push(data.gas_ppm  != null ? data.gas_ppm    : null);  // PPM
+    chartData.api.push(data.api          != null ? data.api         : null);  // raw analog
 
     if (chartData.labels.length > MAX_CHART_POINTS) {
-        chartData.labels.shift();
-        chartData.suhu.shift();
-        chartData.kelembapan.shift();
-        chartData.gas.shift();
-        chartData.api.shift();
+        chartData.labels.shift(); chartData.suhu.shift(); chartData.kelembapan.shift();
+        chartData.gas_ppm.shift(); chartData.api.shift();
     }
-
     if (tempHumChart) tempHumChart.update();
     if (gasFireChart) gasFireChart.update();
 }
 
 function resetChartData() {
-    chartData.labels.splice(0);
-    chartData.suhu.splice(0);
-    chartData.kelembapan.splice(0);
-    chartData.gas.splice(0);
-    chartData.api.splice(0);
+    chartData.labels.splice(0); chartData.suhu.splice(0); chartData.kelembapan.splice(0);
+    chartData.gas_ppm.splice(0); chartData.api.splice(0);
     if (tempHumChart) tempHumChart.update();
     if (gasFireChart) gasFireChart.update();
 }
 
 function loadHistoricalDataToCharts() {
     const history = getHistoryData();
-
-    chartData.labels.splice(0);
-    chartData.suhu.splice(0);
-    chartData.kelembapan.splice(0);
-    chartData.gas.splice(0);
-    chartData.api.splice(0);
-
+    chartData.labels.splice(0); chartData.suhu.splice(0); chartData.kelembapan.splice(0);
+    chartData.gas_ppm.splice(0); chartData.api.splice(0);
     if (!history || history.length === 0) {
         if (tempHumChart) tempHumChart.update();
         if (gasFireChart) gasFireChart.update();
         return;
     }
-
-    const dataToLoad = history.slice(0, MAX_CHART_POINTS).reverse();
-    dataToLoad.forEach(entry => {
-        const timeLabel = new Date(entry.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        chartData.labels.push(timeLabel);
-        chartData.suhu.push(entry.suhu ?? null);
+    history.slice(0, MAX_CHART_POINTS).reverse().forEach(entry => {
+        chartData.labels.push(new Date(entry.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+        chartData.suhu.push(entry.suhu         ?? null);
         chartData.kelembapan.push(entry.kelembapan ?? null);
-        chartData.gas.push(entry.gas ?? null);
-        chartData.api.push(entry.api ?? null);
+        chartData.gas_ppm.push(entry.gas_ppm   ?? null);  // gunakan gas_ppm, fallback null
+        chartData.api.push(entry.api           ?? null);
     });
-
     if (tempHumChart) tempHumChart.update();
     if (gasFireChart) gasFireChart.update();
-    console.log('Loaded historical data to charts:', dataToLoad.length, 'points');
+    console.log('Loaded historical data to charts');
 }
-
 
 // ================================================
 // CHATBOT
+// Disesuaikan dengan sensor & status Arduino
 // ================================================
 
 const chatbotKnowledge = {
-    'spray sereh': {
-        response: `<strong>Cara Membuat Spray Ekstrak Sereh:</strong><br><br>
-<strong>Bahan:</strong><br>- 200g daun sereh segar (dicincang)<br>- 1 liter air<br>- 2 sdm sabun cuci piring alami<br><br>
-<strong>Cara Pembuatan:</strong><br>- Rebus daun sereh 30 menit<br>- Dinginkan dan saring<br>- Tambahkan sabun piring (sebagai perekat)<br>- Masukkan ke botol spray<br><br>
-<strong>Penggunaan:</strong><br>- Semprot tiap 3-5 hari<br>- Pagi atau sore hari<br>- Fokus bawah daun<br><br>
-<strong>Manfaat:</strong> Mengusir kutu daun, ulat, serangga. Aman untuk tanaman & lingkungan.`
-    },
-    'neem': {
-        response: `<strong>Manfaat Neem Oil untuk Tanaman:</strong><br><br>
-Diekstrak dari biji pohon neem. Mengandung azadirachtin yang efektif melawan hama.<br><br>
-<strong>Manfaat Utama:</strong><br>- Kendalikan 200+ jenis hama (aphids, whiteflies, mealybugs)<br>- Cegah penyakit jamur (powdery mildew, black spot)<br>- Tidak beracun untuk manusia & hewan<br><br>
-<strong>Cara Penggunaan:</strong><br>- 2-3 sdm neem oil per liter air<br>- Tambah 1 sdt sabun cuci piring<br>- Kocok rata dan semprotkan<br>- Ulangi setiap 7-14 hari<br><br>
-<strong>Tips:</strong> Aplikasikan saat suhu &lt; 30°C, hindari terik matahari.`
-    },
-    'cegah hama': {
-        response: `<strong>Cara Mencegah Hama di Gudang:</strong><br><br>
-<strong>1. Kontrol Kelembapan:</strong> Jaga 40-60%, gunakan dehumidifier jika &gt; 70%<br>
-<strong>2. Kebersihan Rutin:</strong> Bersihkan gudang tiap minggu<br>
-<strong>3. Penyemprotan Preventif:</strong> Spray sereh tiap 5 hari, neem oil 2 minggu sekali<br>
-<strong>4. Monitoring:</strong> Cek tanaman tiap hari, isolasi tanaman terinfeksi<br>
-<strong>5. Natural Repellent:</strong> Tanam lavender/mint/basil di sekitar gudang<br><br>
-<strong>Hama Umum:</strong><br>- Kutu daun: Spray air sabun + sereh<br>- Ulat: Ambil manual + neem oil<br>- Tungau: Tingkatkan kelembapan + neem<br>- Lalat buah: Perangkap cuka apel`
-    },
-    'waktu semprot': {
-        response: `<strong>Waktu Terbaik Penyemprotan:</strong><br><br>
-<strong>Pagi (06:00-09:00):</strong> Suhu sejuk, stomata terbuka, penyerapan optimal<br>
-<strong>Sore (16:00-18:00):</strong> Tidak terik, spray bertahan lebih lama<br><br>
-<strong>HINDARI:</strong> Siang hari, saat hujan, saat angin kencang<br><br>
-<strong>Frekuensi Preventif:</strong><br>- Sereh: 5-7 hari sekali<br>- Neem oil: 10-14 hari sekali<br><br>
-<strong>Frekuensi Kuratif (ada hama):</strong><br>- Sereh: 3 hari sekali<br>- Neem oil: 5-7 hari sekali`
-    },
-    'kombinasi': {
-        response: `<strong>Kombinasi Spray Sereh + Neem:</strong><br><br>
-<strong>Bahan Power Spray:</strong><br>- 100g daun sereh (rebusan dingin)<br>- 2 sdm neem oil<br>- 1 sdt sabun cuci piring<br>- 1 liter air<br><br>
-<strong>Keuntungan:</strong> Perlindungan ganda, efektif untuk hama membandel<br><br>
-<strong>Jadwal:</strong><br>- Minggu 1 & 3: Spray kombinasi<br>- Minggu 2: Sereh murni<br>- Minggu 4: Neem murni`
-    }
+    'spray sereh': { response: `<strong>Cara Membuat Spray Ekstrak Sereh:</strong><br><br><strong>Bahan:</strong><br>- 200g daun sereh segar (dicincang)<br>- 1 liter air<br>- 2 sdm sabun cuci piring alami<br><br><strong>Cara Pembuatan:</strong><br>- Rebus daun sereh 30 menit<br>- Dinginkan dan saring<br>- Tambahkan sabun piring<br>- Masukkan ke botol spray<br><br><strong>Penggunaan:</strong><br>- Semprot tiap 3-5 hari, pagi atau sore, fokus bawah daun.` },
+    'neem': { response: `<strong>Manfaat Neem Oil:</strong><br><br>- Kendalikan 200+ jenis hama<br>- Cegah penyakit jamur<br>- Tidak beracun untuk manusia<br><br><strong>Cara:</strong> 2-3 sdm neem oil + 1 liter air + 1 sdt sabun, semprotkan tiap 7-14 hari.` },
+    'cegah hama': { response: `<strong>Mencegah Hama di Gudang:</strong><br><br>1. Jaga kelembapan 40-60%<br>2. Kebersihan rutin tiap minggu<br>3. Spray sereh tiap 5 hari<br>4. Neem oil 2 minggu sekali<br>5. Tanam lavender/mint di sekitar gudang` },
+    'waktu semprot': { response: `<strong>Waktu Terbaik:</strong><br><br>Pagi 06:00-09:00 atau Sore 16:00-18:00<br><br>HINDARI: Siang hari, saat hujan, angin kencang<br><br>Preventif: Sereh 5-7 hari, Neem 10-14 hari<br>Kuratif: Sereh 3 hari, Neem 5-7 hari` },
+    'kombinasi': { response: `<strong>Power Spray Sereh + Neem:</strong><br><br>100g sereh rebusan + 2 sdm neem oil + 1 sdt sabun + 1 liter air<br><br>Jadwal: Minggu 1&3 kombinasi, Minggu 2 sereh murni, Minggu 4 neem murni` },
+
+    // ---- INFO SENSOR & STATUS SESUAI ARDUINO ----
+    'status normal': { response: `<strong>Status NORMAL:</strong><br>Semua kondisi gudang aman:<br>- Suhu ≤ ${THRESHOLD.SUHU_PANAS}°C<br>- Kelembapan ${THRESHOLD.KELEMBAPAN_KERING}–${THRESHOLD.KELEMBAPAN_LEMBAP}%<br>- Gas &lt; ${THRESHOLD.GAS_PPM_THRESHOLD} PPM<br>- Tidak ada api terdeteksi` },
+    'kebakaran': { response: `<strong>Status KEBAKARAN:</strong><br>Kondisi DARURAT! Arduino mendeteksi:<br>- Fire sensor &gt; ${THRESHOLD.FIRE_THRESHOLD} (analog)<br>- Gas &gt; ${THRESHOLD.GAS_PPM_THRESHOLD} PPM<br>- Suhu &gt; ${THRESHOLD.SUHU_PANAS}°C<br><br><strong>Tindakan:</strong> Evakuasi segera, hubungi damkar!` },
+    'terlalu panas': { response: `<strong>Status TERLALU_PANAS:</strong><br>Suhu gudang &gt; ${THRESHOLD.SUHU_PANAS}°C.<br><br>Tindakan:<br>- Buka ventilasi/jendela<br>- Nyalakan kipas/pendingin<br>- Kurangi sumber panas di sekitar gudang` },
+    'gas berbahaya': { response: `<strong>Status GAS_BERBAHAYA:</strong><br>Sensor MQ135 mendeteksi gas &gt; ${THRESHOLD.GAS_PPM_THRESHOLD} PPM.<br><br>Tindakan:<br>- Buka jendela/ventilasi segera<br>- Jauhkan dari sumber api<br>- Cek sumber kebocoran gas` },
+    'kering': { response: `<strong>Status KERING:</strong><br>Kelembapan &lt; ${THRESHOLD.KELEMBAPAN_KERING}%.<br><br>Tindakan:<br>- Aktifkan penyemprot air (spray)<br>- Siram tanaman<br>- Tambah humidifier jika tersedia` },
+    'terlalu lembap': { response: `<strong>Status TERLALU_LEMBAP:</strong><br>Kelembapan &gt; ${THRESHOLD.KELEMBAPAN_LEMBAP}%.<br><br>Tindakan:<br>- Buka ventilasi, nyalakan dehumidifier<br>- Periksa tanda jamur pada tanaman<br>- Semprot neem oil untuk pencegahan hama` },
+    'gas ppm': { response: `<strong>Sensor Gas MQ135:</strong><br><br>Arduino mengkonversi nilai analog ke PPM menggunakan rumus dari datasheet MQ135.<br><br>Ambang batas: <strong>${THRESHOLD.GAS_PPM_THRESHOLD} PPM</strong><br><br>Di bawah batas = udara aman.<br>Di atas batas = status GAS_BERBAHAYA aktif.` },
+    'fire sensor': { response: `<strong>Sensor Api (Fire Sensor):</strong><br><br>Membaca nilai analog 0–4095.<br>Semakin KECIL nilai = cahaya/api makin terang.<br><br>Ambang batas: <strong>${THRESHOLD.FIRE_THRESHOLD}</strong><br><br>Nilai &gt; threshold = potensi api terdeteksi (dikombinasi dengan gas & suhu untuk status KEBAKARAN).` },
+    'box penyimpanan': { response: `<strong>Status Box Penyimpanan (Ultrasonik):</strong><br><br>Sensor ultrasonik mengukur jarak ke isi gudang.<br><br>Jarak &lt; ${THRESHOLD.DISTANCE_FULL} cm = PENUH<br>Jarak = 999 = Sensor error<br><br>Jika penuh, segera kosongkan gudang penyimpanan!` }
 };
 
 let chatbotOpen = false;
 
 function initChatbot() {
-    const chatbotBtn     = document.getElementById('chatbotBtn');
-    const chatbotModal   = document.getElementById('chatbotModal');
-    const chatbotClose   = document.getElementById('chatbotClose');
-    const chatInput      = document.getElementById('chatInput');
-    const chatSendBtn    = document.getElementById('chatSendBtn');
-    const suggestionBtns = document.querySelectorAll('.suggestion-btn');
-
+    const chatbotBtn   = document.getElementById('chatbotBtn');
+    const chatbotModal = document.getElementById('chatbotModal');
+    const chatbotClose = document.getElementById('chatbotClose');
+    const chatInput    = document.getElementById('chatInput');
+    const chatSendBtn  = document.getElementById('chatSendBtn');
     if (!chatbotBtn) return;
-
-    chatbotBtn.addEventListener('click', () => {
-        chatbotOpen = !chatbotOpen;
-        chatbotModal.classList.toggle('active', chatbotOpen);
-    });
-    chatbotClose.addEventListener('click', () => {
-        chatbotOpen = false;
-        chatbotModal.classList.remove('active');
-    });
-    chatSendBtn.addEventListener('click', () => {
-        const message = chatInput.value.trim();
-        if (message) { sendMessage(message); chatInput.value = ''; }
-    });
-    chatInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            const message = chatInput.value.trim();
-            if (message) { sendMessage(message); chatInput.value = ''; }
-        }
-    });
-    suggestionBtns.forEach(btn => btn.addEventListener('click', () => sendMessage(btn.dataset.question)));
+    chatbotBtn.addEventListener('click', () => { chatbotOpen = !chatbotOpen; chatbotModal.classList.toggle('active', chatbotOpen); });
+    chatbotClose.addEventListener('click', () => { chatbotOpen = false; chatbotModal.classList.remove('active'); });
+    chatSendBtn.addEventListener('click', () => { const m = chatInput.value.trim(); if (m) { sendMessage(m); chatInput.value = ''; } });
+    chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') { const m = chatInput.value.trim(); if (m) { sendMessage(m); chatInput.value = ''; } } });
+    document.querySelectorAll('.suggestion-btn').forEach(btn => btn.addEventListener('click', () => sendMessage(btn.dataset.question)));
 }
 
 function sendMessage(message) {
@@ -547,70 +580,77 @@ function sendMessage(message) {
 }
 
 function addChatMessage(message, sender) {
-    const chatBody   = document.getElementById('chatbotBody');
-    const messageDiv = document.createElement('div');
-    messageDiv.className = 'chat-message ' + sender;
-
+    const chatBody = document.getElementById('chatbotBody');
+    const div = document.createElement('div');
+    div.className = 'chat-message ' + sender;
     const avatar = document.createElement('div');
     avatar.className = 'message-avatar';
     avatar.innerHTML = sender === 'bot' ? '<i class="fas fa-robot"></i>' : '<i class="fas fa-user"></i>';
-
     const content = document.createElement('div');
     content.className = 'message-content';
     if (sender === 'user') content.textContent = message;
     else content.innerHTML = message;
-
-    messageDiv.appendChild(avatar);
-    messageDiv.appendChild(content);
-    chatBody.appendChild(messageDiv);
+    div.appendChild(avatar); div.appendChild(content);
+    chatBody.appendChild(div);
     chatBody.scrollTop = chatBody.scrollHeight;
 }
 
 function processMessage(message) {
     const m = message.toLowerCase();
-    if (m.includes('sereh') || m.includes('serai'))                          return chatbotKnowledge['spray sereh'].response;
-    if (m.includes('neem'))                                                   return chatbotKnowledge['neem'].response;
-    if (m.includes('cegah') || m.includes('pencegah') || m.includes('hama')) return chatbotKnowledge['cegah hama'].response;
-    if (m.includes('waktu') || m.includes('kapan'))                          return chatbotKnowledge['waktu semprot'].response;
-    if (m.includes('kombinasi') || m.includes('campur'))                     return chatbotKnowledge['kombinasi'].response;
 
-    if (m.includes('kutu daun') || m.includes('aphid')) {
-        return `<strong>Mengatasi Kutu Daun:</strong><br><br>
-<strong>Gejala:</strong> Daun mengeriting dan menguning, lapisan lengket pada daun<br><br>
-<strong>Solusi:</strong><br>1. Spray air sabun: 1 sdm sabun + 1 liter air<br>2. Ekstrak sereh: 3 hari sekali<br>3. Neem oil minggu kedua<br>4. Semprotan air kuat<br><br>
-<strong>Pencegahan:</strong> Tanam marigold atau nasturtium di sekitar tanaman.`;
-    }
-    if (m.includes('ulat')) {
-        return `<strong>Mengatasi Ulat:</strong><br><br>
-<strong>Identifikasi:</strong> Daun berlubang, kotoran hitam di daun<br><br>
-<strong>Solusi:</strong><br>1. Ambil ulat manual (pakai sarung tangan)<br>2. Neem oil setiap 5-7 hari<br>3. Bacillus thuringiensis (Bt)<br>4. Ekstrak cabai: 5 cabai + 1 liter air, rebus & semprot`;
-    }
-    if (m.includes('jamur') || m.includes('fungi')) {
-        return `<strong>Mengatasi Jamur:</strong><br><br>
-<strong>Gejala:</strong> Bercak putih seperti tepung, bercak hitam/coklat, daun busuk<br><br>
-<strong>Solusi:</strong><br>1. Neem oil: 2x seminggu<br>2. Baking soda: 1 sdt + 1 liter air + sabun<br>3. Susu spray: susu:air = 1:9<br>4. Potong bagian terinfeksi`;
-    }
-    if (m.includes('pir') || m.includes('gerak') || m.includes('motion')) {
-        return `<strong>Sensor PIR (Passive Infrared):</strong><br><br>
-Mendeteksi gerakan manusia atau hewan di sekitar gudang berdasarkan perubahan radiasi inframerah.<br><br>
-<strong>Fungsi di SmartFarm:</strong><br>- Memantau aktivitas di dalam gudang<br>- Mendeteksi hewan liar (tikus, kucing) yang masuk<br>- Keamanan gudang penyimpanan<br><br>
-<strong>Status:</strong><br>- <strong>ADA</strong>: Ada gerakan terdeteksi — cek gudang segera!<br>- <strong>AMAN</strong>: Tidak ada gerakan, gudang aman<br><br>
-<strong>Tips:</strong> Pantau log PIR di tabel riwayat untuk pola aktivitas mencurigakan.`;
+    // Pertanyaan tentang sensor
+    if (m.includes('sereh') || m.includes('serai'))                              return chatbotKnowledge['spray sereh'].response;
+    if (m.includes('neem'))                                                       return chatbotKnowledge['neem'].response;
+    if (m.includes('cegah') || m.includes('pencegah') || m.includes('hama'))     return chatbotKnowledge['cegah hama'].response;
+    if (m.includes('waktu') || m.includes('kapan'))                              return chatbotKnowledge['waktu semprot'].response;
+    if (m.includes('kombinasi') || m.includes('campur'))                         return chatbotKnowledge['kombinasi'].response;
+
+    // Status Arduino
+    if (m.includes('kebakaran'))                                                  return chatbotKnowledge['kebakaran'].response;
+    if (m.includes('terlalu panas') || m.includes('terlalu_panas'))               return chatbotKnowledge['terlalu panas'].response;
+    if (m.includes('gas berbahaya') || m.includes('gas_berbahaya'))               return chatbotKnowledge['gas berbahaya'].response;
+    if (m.includes('kering') && !m.includes('lembap'))                           return chatbotKnowledge['kering'].response;
+    if (m.includes('lembap') || m.includes('lembab'))                            return chatbotKnowledge['terlalu lembap'].response;
+    if (m.includes('normal'))                                                     return chatbotKnowledge['status normal'].response;
+
+    // Sensor spesifik
+    if (m.includes('ppm') || (m.includes('gas') && !m.includes('berbahaya')))    return chatbotKnowledge['gas ppm'].response;
+    if (m.includes('api') || m.includes('fire'))                                  return chatbotKnowledge['fire sensor'].response;
+    if (m.includes('box') || m.includes('simpan') || m.includes('ultrasonik') || m.includes('jarak')) return chatbotKnowledge['box penyimpanan'].response;
+    if (m.includes('pir') || m.includes('gerak') || m.includes('motion'))
+        return `<strong>Sensor PIR:</strong><br>Mendeteksi gerakan di gudang.<br>- <strong>ADA</strong>: ada gerakan, cek gudang!<br>- <strong>AMAN</strong>: tidak ada gerakan.<br><br>Arduino mengirim <code>true/false</code>, di-convert ke 1/0 di dashboard.`;
+
+    // Hama spesifik
+    if (m.includes('kutu') || m.includes('aphid'))    return `<strong>Kutu Daun:</strong><br>Spray air sabun + sereh tiap 3 hari. Neem oil minggu berikutnya.`;
+    if (m.includes('ulat'))                           return `<strong>Ulat:</strong><br>Ambil manual + neem oil tiap 5-7 hari + ekstrak cabai.`;
+    if (m.includes('jamur'))                          return `<strong>Jamur:</strong><br>Neem oil 2x seminggu + baking soda (1 sdt/liter) + potong bagian terinfeksi.`;
+
+    // Kondisi real-time
+    if (m.includes('kondisi') || m.includes('sekarang') || m.includes('status')) {
+        const d = getLatestData();
+        if (!d) return 'Belum ada data dari sensor. Pastikan ESP32 terhubung ke MQTT.';
+        return `<strong>Kondisi Terkini:</strong><br>` +
+               `Suhu: ${d.suhu != null ? d.suhu.toFixed(1) + '°C' : '-'}<br>` +
+               `Kelembapan: ${d.kelembapan != null ? d.kelembapan.toFixed(1) + '%' : '-'}<br>` +
+               `Gas: ${d.gas_ppm != null ? d.gas_ppm.toFixed(1) + ' PPM' : '-'}<br>` +
+               `Api: ${d.api != null ? Math.round(d.api) + ' (analog)' : '-'}<br>` +
+               `PIR: ${d.pir === 1 ? 'ADA GERAKAN' : 'AMAN'}<br>` +
+               `Status: <strong>${getStatusLabel(d.status)}</strong>`;
     }
 
-    return `Halo! Saya dapat membantu dengan:<br><br>
-- <strong>Cara membuat spray sereh</strong><br>
-- <strong>Manfaat neem oil</strong><br>
-- <strong>Mengatasi hama (kutu daun, ulat, jamur)</strong><br>
-- <strong>Pencegahan hama di gudang</strong><br>
-- <strong>Waktu terbaik penyemprotan</strong><br>
-- <strong>Sensor PIR & deteksi gerakan</strong><br><br>
-Coba tanyakan: "Bagaimana cara membuat spray sereh?" atau "Apa itu sensor PIR?"`;
+    return `Halo! Saya bisa bantu:<br>
+- Spray sereh &amp; neem oil<br>
+- Mengatasi hama (kutu, ulat, jamur)<br>
+- Waktu penyemprotan<br>
+- Status sensor: <em>normal, kebakaran, terlalu panas, gas berbahaya, kering, terlalu lembap</em><br>
+- Info sensor: PIR, gas PPM, fire sensor, box penyimpanan<br>
+- Ketik <strong>"kondisi sekarang"</strong> untuk data real-time<br><br>
+Coba: "cara buat spray sereh", "gas berbahaya", atau "kondisi sekarang"`;
 }
-
 
 // ================================================
 // HISTORY TABLE
+// Kolom gas sekarang menampilkan gas_ppm (PPM)
 // ================================================
 
 let currentPage = 1;
@@ -623,55 +663,44 @@ function renderHistoryTable() {
     const data  = getHistoryData();
     const tbody = document.getElementById('historyTableBody');
     if (!tbody) return;
-
     if (!data || data.length === 0) {
         tbody.innerHTML = '<tr><td colspan="8" class="no-data">Belum ada data</td></tr>';
-        updatePagination(0);
-        return;
+        updatePagination(0); return;
     }
 
     const totalPages = Math.ceil(data.length / rowsPerPage);
     if (currentPage > totalPages) currentPage = totalPages;
-
-    const startIndex = (currentPage - 1) * rowsPerPage;
-    const pageData   = data.slice(startIndex, startIndex + rowsPerPage);
-
     tbody.innerHTML = '';
-    pageData.forEach(entry => {
+
+    data.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage).forEach(entry => {
         const row     = document.createElement('tr');
-        const timeStr = new Date(entry.timestamp).toLocaleString('id-ID', {
-            day: '2-digit', month: '2-digit', year: 'numeric',
-            hour: '2-digit', minute: '2-digit', second: '2-digit'
-        });
-
-        const suhu       = (entry.suhu != null)       ? entry.suhu.toFixed(1) + ' °C' : '-';
-        const kelembapan = (entry.kelembapan != null)  ? entry.kelembapan.toFixed(1) + ' %' : '-';
-        const gas        = (entry.gas != null)         ? Math.round(entry.gas) : '-';
-        const api        = (entry.api != null)         ? Math.round(entry.api) : '-';
-        const jarak      = (entry.jarak != null && entry.jarak > 0) ? entry.jarak.toFixed(1) + ' cm' : '-';
-
+        const timeStr = new Date(entry.timestamp).toLocaleString('id-ID', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit', second:'2-digit' });
         const pirNorm = (entry.pir === true || entry.pir === 1) ? 1 : 0;
-        const pirVal  = pirNorm === 1 ? '⚠ ADA' : '✔ AMAN';
-        const pirCls  = pirNorm === 1 ? 'pir-alert' : 'pir-safe';
+        const statusCode = entry.status ? entry.status.trim() : 'NORMAL';
+        const statusLabel = getStatusLabel(statusCode);
+        const statusLevel = STATUS_LEVEL[statusCode] || 'normal';
 
-        const status = entry.status
-                       ? entry.status.replace(/[^\x00-\x7F]/g, '').trim() || entry.status
-                       : '-';
+        // Gas: tampilkan gas_ppm jika ada, fallback ke gas (raw), fallback '-'
+        const gasDisplay = entry.gas_ppm != null
+            ? entry.gas_ppm.toFixed(1) + ' PPM'
+            : (entry.gas != null ? Math.round(entry.gas) + ' raw' : '-');
 
-        // Kolom cahaya dihapus — colspan jadi 8
+        // Jarak: tampilkan '--' jika 999 (sensor error) atau 0
+        const jarakDisplay = (entry.jarak != null && entry.jarak > 0 && entry.jarak < 999)
+            ? entry.jarak.toFixed(1) + ' cm'
+            : (entry.jarak === 999 ? 'Error' : '-');
+
         row.innerHTML =
             '<td>' + timeStr + '</td>' +
-            '<td>' + suhu + '</td>' +
-            '<td>' + kelembapan + '</td>' +
-            '<td>' + gas + '</td>' +
-            '<td>' + api + '</td>' +
-            '<td>' + jarak + '</td>' +
-            '<td><span class="pir-table ' + pirCls + '">' + pirVal + '</span></td>' +
-            '<td><span class="status-badge">' + status + '</span></td>';
-
+            '<td>' + (entry.suhu       != null ? entry.suhu.toFixed(1) + ' °C' : '-') + '</td>' +
+            '<td>' + (entry.kelembapan != null ? entry.kelembapan.toFixed(1) + ' %' : '-') + '</td>' +
+            '<td>' + gasDisplay + '</td>' +
+            '<td>' + (entry.api        != null ? Math.round(entry.api) : '-') + '</td>' +
+            '<td>' + jarakDisplay + '</td>' +
+            '<td><span class="pir-table ' + (pirNorm === 1 ? 'pir-alert' : 'pir-safe') + '">' + (pirNorm === 1 ? 'ADA' : 'AMAN') + '</span></td>' +
+            '<td><span class="status-badge status-' + statusLevel + '">' + statusLabel + '</span></td>';
         tbody.appendChild(row);
     });
-
     updatePagination(totalPages);
 }
 
@@ -679,13 +708,10 @@ function updatePagination(totalPages) {
     const pagination = document.getElementById('pagination');
     if (!pagination) return;
     if (totalPages <= 1) { pagination.innerHTML = ''; return; }
-
     pagination.innerHTML =
-        '<button onclick="changePage(' + (currentPage - 1) + ')" ' + (currentPage === 1 ? 'disabled' : '') + '>' +
-        '<i class="fas fa-chevron-left"></i> Prev</button>' +
+        '<button onclick="changePage(' + (currentPage-1) + ')" ' + (currentPage===1?'disabled':'') + '><i class="fas fa-chevron-left"></i> Prev</button>' +
         '<span>Halaman ' + currentPage + ' dari ' + totalPages + '</span>' +
-        '<button onclick="changePage(' + (currentPage + 1) + ')" ' + (currentPage === totalPages ? 'disabled' : '') + '>' +
-        'Next <i class="fas fa-chevron-right"></i></button>';
+        '<button onclick="changePage(' + (currentPage+1) + ')" ' + (currentPage===totalPages?'disabled':'') + '>Next <i class="fas fa-chevron-right"></i></button>';
 }
 
 function changePage(newPage) {
@@ -694,33 +720,20 @@ function changePage(newPage) {
     currentPage = newPage;
     renderHistoryTable();
 }
-
 window.changePage = changePage;
-
 
 // ================================================
 // MAIN APPLICATION
 // ================================================
 
-function initMainApp() {
-    initRealtimeClock();
-    initHistoryTable();
-    setupEventListeners();
-    console.log('Main app initialized');
-}
+function initMainApp() { initRealtimeClock(); initHistoryTable(); setupEventListeners(); console.log('Main app initialized'); }
 
-function initRealtimeClock() {
-    updateClock();
-    setInterval(updateClock, 1000);
-}
+function initRealtimeClock() { updateClock(); setInterval(updateClock, 1000); }
 
 function updateClock() {
-    const clockDisplay = document.getElementById('clockDisplay');
-    if (!clockDisplay) return;
-    clockDisplay.textContent = new Date().toLocaleDateString('id-ID', {
-        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
-        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
-    });
+    const el = document.getElementById('clockDisplay');
+    if (!el) return;
+    el.textContent = new Date().toLocaleDateString('id-ID', { weekday:'long', year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false });
 }
 
 function setupEventListeners() {
@@ -729,25 +742,18 @@ function setupEventListeners() {
 }
 
 document.addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-        e.preventDefault();
-        const btn = document.getElementById('chatbotBtn');
-        if (btn) btn.click();
-    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); const btn = document.getElementById('chatbotBtn'); if (btn) btn.click(); }
 });
 
 window.addEventListener('error', (e) => console.error('Global error:', e.error));
 window.addEventListener('unhandledrejection', (e) => console.error('Unhandled rejection:', e.reason));
 
 window.debugInfo = function() {
-    console.log('=== DEBUG INFO ===');
-    console.log('History Data:', getHistoryData());
-    console.log('Latest Data:', getLatestData());
-    console.log('Current Page:', currentPage);
-    console.log('MQTT Connected:', isConnected);
-    console.log('Chart Labels:', chartData.labels);
+    console.log('History:', getHistoryData());
+    console.log('Latest:', getLatestData());
+    console.log('Connected:', isConnected, '| Broker:', BROKER_CANDIDATES[brokerIndex]);
+    console.log('Thresholds:', THRESHOLD);
 };
-
 
 // ================================================
 // INITIALIZE ALL ON DOM READY
@@ -756,8 +762,7 @@ window.debugInfo = function() {
 document.addEventListener('DOMContentLoaded', () => {
     loadHistoryFromLocalStorage();
 
-    // FIX: Chart diinit SEBELUM MQTT agar object chart sudah ada
-    // saat data pertama masuk dan updateCharts() dipanggil
+    // Chart HARUS diinit sebelum MQTT connect
     initCharts();
     loadHistoricalDataToCharts();
 
@@ -765,5 +770,5 @@ document.addEventListener('DOMContentLoaded', () => {
     initChatbot();
     initMainApp();
 
-    console.log('SmartFarm App Ready');
+    console.log('SmartFarm App Ready (synced with Arduino firmware)');
 });
