@@ -10,28 +10,24 @@
 }
 
 :root {
-    /* Primary Green Colors */
     --primary-green: #2d7a3e;
     --primary-green-dark: #1e5a2c;
     --primary-green-light: #4caf50;
     --accent-green: #66bb6a;
     --light-green: #c8e6c9;
     --very-light-green: #e8f5e9;
-    
-    /* Status Colors */
+
     --danger-red: #e74c3c;
     --warning-orange: #f39c12;
     --info-blue: #3498db;
     --success-green: #27ae60;
-    
-    /* Neutral Colors */
+
     --bg-primary: #f0f4f0;
     --bg-secondary: #ffffff;
     --text-primary: #2c3e50;
     --text-secondary: #7f8c8d;
     --border-color: #d1e7d1;
-    
-    /* Shadows */
+
     --shadow-sm: 0 2px 4px rgba(45, 122, 62, 0.1);
     --shadow-md: 0 4px 12px rgba(45, 122, 62, 0.15);
     --shadow-lg: 0 8px 24px rgba(45, 122, 62, 0.2);
@@ -52,7 +48,7 @@ body {
 }
 
 /* ===============================================
-   HEADER STYLES
+   HEADER
    =============================================== */
 
 .header {
@@ -109,13 +105,8 @@ body {
     font-weight: 500;
 }
 
-.connection-status.connected {
-    background: rgba(39, 174, 96, 0.3);
-}
-
-.connection-status.disconnected {
-    background: rgba(231, 76, 60, 0.3);
-}
+.connection-status.connected    { background: rgba(39, 174, 96, 0.3); }
+.connection-status.disconnected { background: rgba(231, 76, 60, 0.3); }
 
 /* ===============================================
    MAIN CONTAINER
@@ -144,39 +135,17 @@ body {
 }
 
 @keyframes slideIn {
-    from {
-        opacity: 0;
-        transform: translateY(-20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(-20px); }
+    to   { opacity: 1; transform: translateY(0); }
 }
 
-.status-banner.danger {
-    background: linear-gradient(135deg, #e74c3c, #c0392b);
-}
+.status-banner.danger  { background: linear-gradient(135deg, #e74c3c, #c0392b); }
+.status-banner.warning { background: linear-gradient(135deg, #f39c12, #e67e22); }
 
-.status-banner.warning {
-    background: linear-gradient(135deg, #f39c12, #e67e22);
-}
+.status-icon { font-size: 3rem; opacity: 0.9; }
 
-.status-icon {
-    font-size: 3rem;
-    opacity: 0.9;
-}
-
-.status-text h3 {
-    font-size: 1.5rem;
-    font-weight: 700;
-    margin-bottom: 5px;
-}
-
-.status-text p {
-    font-size: 1rem;
-    opacity: 0.95;
-}
+.status-text h3 { font-size: 1.5rem; font-weight: 700; margin-bottom: 5px; }
+.status-text p  { font-size: 1rem; opacity: 0.95; }
 
 /* ===============================================
    SPRAY REMINDER
@@ -230,6 +199,18 @@ body {
     border-color: var(--primary-green-light);
 }
 
+/* PIR card aktif (ada gerakan) */
+.sensor-card.pir-active {
+    border-color: var(--danger-red);
+    background: #fff5f5;
+    animation: pirPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pirPulse {
+    0%, 100% { box-shadow: var(--shadow-md); }
+    50%       { box-shadow: 0 0 20px rgba(231, 76, 60, 0.4); }
+}
+
 .sensor-icon {
     width: 70px;
     height: 70px;
@@ -239,31 +220,18 @@ body {
     justify-content: center;
     font-size: 2rem;
     color: white;
+    flex-shrink: 0;
 }
 
-.sensor-icon.temperature {
-    background: linear-gradient(135deg, #e74c3c, #c0392b);
-}
+.sensor-icon.temperature { background: linear-gradient(135deg, #e74c3c, #c0392b); }
+.sensor-icon.humidity    { background: linear-gradient(135deg, #3498db, #2980b9); }
+.sensor-icon.gas         { background: linear-gradient(135deg, #9b59b6, #8e44ad); }
+.sensor-icon.fire        { background: linear-gradient(135deg, #f39c12, #e67e22); }
+.sensor-icon.distance    { background: linear-gradient(135deg, #1abc9c, #16a085); }
+.sensor-icon.pir         { background: linear-gradient(135deg, #e67e22, #d35400); }
+.sensor-icon.light       { background: linear-gradient(135deg, #f1c40f, #f39c12); }
 
-.sensor-icon.humidity {
-    background: linear-gradient(135deg, #3498db, #2980b9);
-}
-
-.sensor-icon.gas {
-    background: linear-gradient(135deg, #9b59b6, #8e44ad);
-}
-
-.sensor-icon.fire {
-    background: linear-gradient(135deg, #f39c12, #e67e22);
-}
-
-.sensor-icon.distance {
-    background: linear-gradient(135deg, #1abc9c, #16a085);
-}
-
-.sensor-info {
-    flex: 1;
-}
+.sensor-info { flex: 1; }
 
 .sensor-info h4 {
     font-size: 0.9rem;
@@ -277,6 +245,7 @@ body {
     font-weight: 700;
     color: var(--primary-green-dark);
     line-height: 1;
+    margin-bottom: 6px;
 }
 
 .sensor-unit {
@@ -284,6 +253,64 @@ body {
     color: var(--text-secondary);
     margin-left: 5px;
 }
+
+/* Cahaya badge di kartu sensor */
+.cahaya-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-top: 4px;
+}
+
+.cahaya-badge.cahaya-gelap   { background: #eaf0fb; color: #2471a3; }
+.cahaya-badge.cahaya-normal  { background: #fef9e7; color: #9a7d0a; }
+.cahaya-badge.cahaya-terang  { background: #fef5e7; color: #e67e22; }
+.cahaya-badge.cahaya-terik   { background: #fdecea; color: #c0392b; }
+
+/* Cahaya badge di tabel history */
+.cahaya-table {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.cahaya-table.cahaya-gelap   { background: #eaf0fb; color: #2471a3; }
+.cahaya-table.cahaya-normal  { background: #fef9e7; color: #9a7d0a; }
+.cahaya-table.cahaya-terang  { background: #fef5e7; color: #e67e22; }
+.cahaya-table.cahaya-terik   { background: #fdecea; color: #c0392b; }
+
+/* Cahaya card terik — highlight */
+.sensor-card.cahaya-terik-active {
+    border-color: #f39c12;
+    background: #fffbf0;
+}
+.pir-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-top: 4px;
+}
+
+.pir-badge.pir-safe  { background: #e8f5e9; color: #1e5a2c; }
+.pir-badge.pir-alert { background: #fdecea; color: #c0392b; }
+
+/* PIR badge di tabel history */
+.pir-table {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.pir-table.pir-safe  { background: #e8f5e9; color: #1e5a2c; }
+.pir-table.pir-alert { background: #fdecea; color: #c0392b; }
 
 /* ===============================================
    CHARTS SECTION
@@ -312,9 +339,7 @@ body {
     font-size: 1.2rem;
 }
 
-.chart-wrapper {
-    position: relative;
-}
+.chart-wrapper { position: relative; }
 
 /* ===============================================
    HISTORY TABLE
@@ -359,10 +384,7 @@ body {
     transition: all 0.3s ease;
 }
 
-.btn-clear:hover {
-    background: #c0392b;
-    transform: translateY(-2px);
-}
+.btn-clear:hover { background: #c0392b; transform: translateY(-2px); }
 
 .table-responsive {
     overflow-x: auto;
@@ -392,13 +414,8 @@ body {
     border-bottom: 1px solid var(--border-color);
 }
 
-.history-table tbody tr {
-    transition: background 0.2s ease;
-}
-
-.history-table tbody tr:hover {
-    background: var(--very-light-green);
-}
+.history-table tbody tr { transition: background 0.2s ease; }
+.history-table tbody tr:hover { background: var(--very-light-green); }
 
 .no-data {
     text-align: center !important;
@@ -431,22 +448,9 @@ body {
     transition: all 0.3s ease;
 }
 
-.pagination button:hover:not(:disabled) {
-    background: var(--primary-green-dark);
-    transform: translateY(-2px);
-}
-
-.pagination button:disabled {
-    background: var(--text-secondary);
-    cursor: not-allowed;
-    opacity: 0.5;
-}
-
-.pagination span {
-    padding: 8px 15px;
-    color: var(--text-primary);
-    font-weight: 500;
-}
+.pagination button:hover:not(:disabled) { background: var(--primary-green-dark); transform: translateY(-2px); }
+.pagination button:disabled { background: var(--text-secondary); cursor: not-allowed; opacity: 0.5; }
+.pagination span { padding: 8px 15px; color: var(--text-primary); font-weight: 500; }
 
 /* ===============================================
    CHATBOT
@@ -469,9 +473,7 @@ body {
     z-index: 999;
 }
 
-.chatbot-btn:hover {
-    transform: scale(1.1);
-}
+.chatbot-btn:hover { transform: scale(1.1); }
 
 .chatbot-badge {
     position: absolute;
@@ -507,19 +509,11 @@ body {
 }
 
 @keyframes slideUp {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
 }
 
-.chatbot-modal.active {
-    display: flex;
-}
+.chatbot-modal.active { display: flex; }
 
 .chatbot-header {
     background: linear-gradient(135deg, var(--primary-green), var(--accent-green));
@@ -548,9 +542,7 @@ body {
     transition: transform 0.2s ease;
 }
 
-.chatbot-close:hover {
-    transform: rotate(90deg);
-}
+.chatbot-close:hover { transform: rotate(90deg); }
 
 .chatbot-body {
     flex: 1;
@@ -568,19 +560,11 @@ body {
 }
 
 @keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
 }
 
-.chat-message.user {
-    flex-direction: row-reverse;
-}
+.chat-message.user { flex-direction: row-reverse; }
 
 .message-avatar {
     width: 40px;
@@ -605,22 +589,11 @@ body {
     max-width: 75%;
 }
 
-.chat-message.user .message-content {
-    background: var(--light-green);
-}
+.chat-message.user .message-content { background: var(--light-green); }
 
-.message-content p {
-    margin-bottom: 8px;
-    line-height: 1.5;
-}
-
-.message-content ul {
-    margin-left: 20px;
-}
-
-.message-content li {
-    margin-bottom: 5px;
-}
+.message-content p  { margin-bottom: 8px; line-height: 1.5; }
+.message-content ul { margin-left: 20px; }
+.message-content li { margin-bottom: 5px; }
 
 .chatbot-suggestions {
     padding: 15px 20px;
@@ -642,10 +615,7 @@ body {
     font-weight: 500;
 }
 
-.suggestion-btn:hover {
-    background: var(--light-green);
-    transform: translateY(-2px);
-}
+.suggestion-btn:hover { background: var(--light-green); transform: translateY(-2px); }
 
 .chatbot-input {
     padding: 15px 20px;
@@ -664,9 +634,7 @@ body {
     transition: border-color 0.3s ease;
 }
 
-.chatbot-input input:focus {
-    border-color: var(--primary-green);
-}
+.chatbot-input input:focus { border-color: var(--primary-green); }
 
 .chatbot-input button {
     width: 45px;
@@ -680,13 +648,20 @@ body {
     transition: all 0.3s ease;
 }
 
-.chatbot-input button:hover {
-    transform: scale(1.1);
-}
+.chatbot-input button:hover { transform: scale(1.1); }
 
 /* ===============================================
-   FOOTER
+   STATUS BADGE & FOOTER
    =============================================== */
+
+.status-badge {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    background: var(--very-light-green);
+    color: var(--primary-green-dark);
+}
 
 .footer {
     background: var(--primary-green-dark);
@@ -697,86 +672,32 @@ body {
 }
 
 /* ===============================================
-   RESPONSIVE DESIGN
+   RESPONSIVE
    =============================================== */
 
 @media (max-width: 768px) {
-    .header-content {
-        flex-direction: column;
-        text-align: center;
-    }
+    .header-content { flex-direction: column; text-align: center; }
+    .sensor-grid    { grid-template-columns: 1fr; }
+    .charts-section { grid-template-columns: 1fr; }
 
-    .sensor-grid {
-        grid-template-columns: 1fr;
-    }
+    .chatbot-modal { right: 15px; bottom: 90px; width: calc(100vw - 30px); }
+    .chatbot-btn   { right: 15px; bottom: 15px; }
 
-    .charts-section {
-        grid-template-columns: 1fr;
-    }
-
-    .chatbot-modal {
-        right: 15px;
-        bottom: 90px;
-        width: calc(100vw - 30px);
-    }
-
-    .chatbot-btn {
-        right: 15px;
-        bottom: 15px;
-    }
-
-    .history-header {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-
-    .message-content {
-        max-width: 85%;
-    }
+    .history-header { flex-direction: column; align-items: flex-start; }
+    .message-content { max-width: 85%; }
 }
 
 @media (max-width: 480px) {
-    .sensor-card {
-        flex-direction: column;
-        text-align: center;
-    }
-
-    .logo {
-        font-size: 1.2rem;
-    }
-
-    .status-banner {
-        flex-direction: column;
-        text-align: center;
-    }
+    .sensor-card   { flex-direction: column; text-align: center; }
+    .logo          { font-size: 1.2rem; }
+    .status-banner { flex-direction: column; text-align: center; }
 }
 
 /* ===============================================
-   SCROLLBAR STYLING
+   SCROLLBAR
    =============================================== */
 
-::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
-}
-
-::-webkit-scrollbar-track {
-    background: var(--very-light-green);
-}
-
-::-webkit-scrollbar-thumb {
-    background: var(--primary-green);
-    border-radius: 5px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: var(--primary-green-dark);
-}
-.status-badge {
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    background: var(--very-light-green);
-    color: var(--primary-green-dark);
-}
+::-webkit-scrollbar        { width: 10px; height: 10px; }
+::-webkit-scrollbar-track  { background: var(--very-light-green); }
+::-webkit-scrollbar-thumb  { background: var(--primary-green); border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: var(--primary-green-dark); }
