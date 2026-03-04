@@ -15,8 +15,7 @@ const MQTT_TOPIC = 'smartfarm/monitoring';
 
 // Coba WSS 8084 dulu, fallback ke WS 8083
 const BROKER_CANDIDATES = [
-    'wss://' + MQTT_HOST + ':8084/mqtt',
-    'ws://'  + MQTT_HOST + ':8083/mqtt'
+    'wss://we141ff2.ala.asia-southeast1.emqxsl.com:8084/mqtt',
 ];
 
 // ================================================
@@ -80,7 +79,7 @@ function tryConnect(idx) {
     const options = {
         clientId: 'webapp_' + Math.random().toString(16).substr(2, 8),
         username: 'PP123',
-        password: '12345',
+        password: '13579',
         clean: true,
         reconnectPeriod: 0,
         connectTimeout: 8000
