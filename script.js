@@ -501,11 +501,12 @@ function updateCharts(data) {
 }
 
 function resetChartData() {
-    chartData.labels     = [];
-    chartData.suhu       = [];
-    chartData.kelembapan = [];
-    chartData.gas        = [];
-    chartData.api        = [];
+    // Gunakan splice agar referensi array di Chart.js tidak putus
+    chartData.labels.splice(0);
+    chartData.suhu.splice(0);
+    chartData.kelembapan.splice(0);
+    chartData.gas.splice(0);
+    chartData.api.splice(0);
     if (tempHumChart) tempHumChart.update();
     if (gasFireChart) gasFireChart.update();
 }
@@ -513,13 +514,19 @@ function resetChartData() {
 // Load data history ke chart saat pertama load (agar chart tidak kosong)
 function loadHistoricalDataToCharts() {
     const history = getHistoryData();
-    if (!history || history.length === 0) return;
 
-    chartData.labels     = [];
-    chartData.suhu       = [];
-    chartData.kelembapan = [];
-    chartData.gas        = [];
-    chartData.api        = [];
+    // Kosongkan dengan splice agar referensi array di Chart.js tetap sama
+    chartData.labels.splice(0);
+    chartData.suhu.splice(0);
+    chartData.kelembapan.splice(0);
+    chartData.gas.splice(0);
+    chartData.api.splice(0);
+
+    if (!history || history.length === 0) {
+        if (tempHumChart) tempHumChart.update();
+        if (gasFireChart) gasFireChart.update();
+        return;
+    }
 
     const dataToLoad = history.slice(0, MAX_CHART_POINTS).reverse();
 
@@ -528,10 +535,10 @@ function loadHistoricalDataToCharts() {
         const timeLabel = date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
         chartData.labels.push(timeLabel);
-        chartData.suhu.push(entry.suhu !== undefined ? entry.suhu : null);
-        chartData.kelembapan.push(entry.kelembapan !== undefined ? entry.kelembapan : null);
-        chartData.gas.push(entry.gas !== undefined ? entry.gas : null);
-        chartData.api.push(entry.api !== undefined ? entry.api : null);
+        chartData.suhu.push(entry.suhu !== undefined && entry.suhu !== null ? entry.suhu : null);
+        chartData.kelembapan.push(entry.kelembapan !== undefined && entry.kelembapan !== null ? entry.kelembapan : null);
+        chartData.gas.push(entry.gas !== undefined && entry.gas !== null ? entry.gas : null);
+        chartData.api.push(entry.api !== undefined && entry.api !== null ? entry.api : null);
     });
 
     if (tempHumChart) tempHumChart.update();
