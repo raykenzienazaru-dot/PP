@@ -3,10 +3,6 @@
 // MQTT + Charts + Chatbot + Main App
 // ================================================
 
-// ================================================
-// MQTT CONNECTION & DATA HANDLING
-// ================================================
-
 let mqttClient = null;
 let isConnected = false;
 let historyData = [];
@@ -35,20 +31,14 @@ function initMQTT() {
             console.log('MQTT Terhubung!');
             isConnected = true;
             updateConnectionStatus('connected');
-
             mqttClient.subscribe(MQTT_CONFIG.topic, (err) => {
-                if (err) {
-                    console.error('Gagal subscribe:', err);
-                } else {
-                    console.log('Subscribe ke topic:', MQTT_CONFIG.topic);
-                }
+                if (err) console.error('Gagal subscribe:', err);
+                else console.log('Subscribe ke topic:', MQTT_CONFIG.topic);
             });
         });
 
         mqttClient.on('message', (topic, message) => {
-            if (topic === MQTT_CONFIG.topic) {
-                handleMQTTMessage(message.toString());
-            }
+            if (topic === MQTT_CONFIG.topic) handleMQTTMessage(message.toString());
         });
 
         mqttClient.on('error', (err) => {
@@ -73,26 +63,28 @@ function initMQTT() {
     }
 }
 
-// Handle incoming MQTT message dari Arduino ESP32
-// JSON: {"suhu":xx,"kelembapan":xx,"gas":xx,"api":xx,"jarak":xx,"pir":0_atau_1,"status":"...","spray":"..."}
 function handleMQTTMessage(rawMessage) {
     try {
         console.log('Raw message:', rawMessage);
-        let message = rawMessage.trim();
-        const data = JSON.parse(message);
+        const data = JSON.parse(rawMessage.trim());
         console.log('Data diterima:', data);
 
-        data.timestamp = new Date().getTime();
-
+        data.timestamp  = new Date().getTime();
         data.suhu       = sanitizeSensorValue(data.suhu);
         data.kelembapan = sanitizeSensorValue(data.kelembapan);
         data.gas        = sanitizeSensorValue(data.gas);
         data.api        = sanitizeSensorValue(data.api);
         data.jarak      = sanitizeSensorValue(data.jarak);
-        // PIR: 0 = tidak ada gerakan, 1 = ada gerakan
-        data.pir        = (data.pir !== undefined && data.pir !== null) ? Number(data.pir) : undefined;
-        // Cahaya: nilai analog 0-4095 atau lux (tergantung sensor LDR/BH1750)
-        data.cahaya     = sanitizeSensorValue(data.cahaya);
+        // cahaya sengaja tidak diproses lagi
+
+        // FIX PIR: Arduino kirim boolean true/false, konversi ke 0/1
+        if (data.pir !== undefined && data.pir !== null) {
+            if (typeof data.pir === 'boolean')     data.pir = data.pir ? 1 : 0;
+            else if (typeof data.pir === 'string') data.pir = (data.pir === 'true' || data.pir === '1') ? 1 : 0;
+            else                                   data.pir = Number(data.pir) ? 1 : 0;
+        } else {
+            data.pir = 0;
+        }
 
         latestData = data;
 
@@ -100,7 +92,7 @@ function handleMQTTMessage(rawMessage) {
         updateStatusBanner(data);
         updateSprayReminder(data);
         addToHistory(data);
-        updateCharts(data);   // ← langsung update chart setiap data baru
+        updateCharts(data);
 
     } catch (error) {
         console.error('Error parsing MQTT message:', error);
@@ -163,48 +155,17 @@ function updateSensorCards(data) {
         if (el) el.textContent = data.jarak > 0 ? data.jarak.toFixed(1) : '--';
     }
 
-    // PIR Sensor: tampilkan status gerak atau aman
-    if (data.pir !== undefined) {
-        const el    = document.getElementById('pirValue');
-        const badge = document.getElementById('pirBadge');
-        const card  = document.getElementById('pirCard');
-        if (el) el.textContent = data.pir === 1 ? 'ADA' : 'AMAN';
-        if (badge) {
-            badge.textContent = data.pir === 1 ? '⚠ Gerakan!' : '✔ Kosong';
-            badge.className = 'pir-badge ' + (data.pir === 1 ? 'pir-alert' : 'pir-safe');
-        }
-        if (card) {
-            card.classList.toggle('pir-active', data.pir === 1);
-        }
+    // PIR
+    const pirEl    = document.getElementById('pirValue');
+    const pirBadge = document.getElementById('pirBadge');
+    const pirCard  = document.getElementById('pirCard');
+
+    if (pirEl)    pirEl.textContent = data.pir === 1 ? 'ADA' : 'AMAN';
+    if (pirBadge) {
+        pirBadge.textContent = data.pir === 1 ? '⚠ Gerakan!' : '✔ Kosong';
+        pirBadge.className   = 'pir-badge ' + (data.pir === 1 ? 'pir-alert' : 'pir-safe');
     }
-
-    // Cahaya Sensor (LDR/BH1750)
-    if (data.cahaya !== undefined) {
-        const el    = document.getElementById('cahayaValue');
-        const badge = document.getElementById('cahayaBadge');
-        const card  = document.getElementById('cahayaCard');
-        if (el) el.textContent = Math.round(data.cahaya);
-
-        // Klasifikasi tingkat cahaya
-        let level, label;
-        if (data.cahaya < 200) {
-            level = 'cahaya-gelap';  label = '🌑 Gelap';
-        } else if (data.cahaya < 1000) {
-            level = 'cahaya-normal'; label = '🌤 Normal';
-        } else if (data.cahaya < 3000) {
-            level = 'cahaya-terang'; label = '☀ Terang';
-        } else {
-            level = 'cahaya-terik';  label = '🔆 Terik!';
-        }
-
-        if (badge) {
-            badge.textContent = label;
-            badge.className = 'cahaya-badge ' + level;
-        }
-        if (card) {
-            card.classList.toggle('cahaya-terik-active', level === 'cahaya-terik');
-        }
-    }
+    if (pirCard) pirCard.classList.toggle('pir-active', data.pir === 1);
 }
 
 function updateStatusBanner(data) {
@@ -256,9 +217,7 @@ function getKeteranganFromStatus(status) {
 
 function updateSprayReminder(data) {
     const sprayEl = document.getElementById('sprayStatus');
-    if (sprayEl && data.spray) {
-        sprayEl.textContent = data.spray;
-    }
+    if (sprayEl && data.spray) sprayEl.textContent = data.spray;
 }
 
 // ================================================
@@ -274,7 +233,7 @@ function addToHistory(data) {
         api:         data.api,
         jarak:       data.jarak,
         pir:         data.pir,
-        cahaya:      data.cahaya,
+        // cahaya dihapus
         status:      data.status
     };
 
@@ -282,7 +241,7 @@ function addToHistory(data) {
     if (historyData.length > 100) historyData = historyData.slice(0, 100);
 
     saveHistoryToLocalStorage();
-    refreshHistoryTable();   // ← tidak reset currentPage, hanya render ulang
+    refreshHistoryTable();
 }
 
 function saveHistoryToLocalStorage() {
@@ -297,7 +256,13 @@ function loadHistoryFromLocalStorage() {
     try {
         const saved = localStorage.getItem('smartfarm_history');
         if (saved) {
-            historyData = JSON.parse(saved);
+            const parsed = JSON.parse(saved);
+            historyData = parsed.map(entry => {
+                if (entry.pir !== undefined && typeof entry.pir === 'boolean') {
+                    entry.pir = entry.pir ? 1 : 0;
+                }
+                return entry;
+            });
             console.log('Loaded ' + historyData.length + ' history entries');
         }
     } catch (error) {
@@ -312,7 +277,6 @@ function clearHistory() {
         saveHistoryToLocalStorage();
         currentPage = 1;
         refreshHistoryTable();
-        // Reset chart data juga
         resetChartData();
         alert('History berhasil dihapus!');
     }
@@ -348,7 +312,6 @@ function initCharts() {
 function initTempHumChart() {
     const ctx = document.getElementById('tempHumChart');
     if (!ctx) return;
-
     if (tempHumChart) { tempHumChart.destroy(); tempHumChart = null; }
 
     tempHumChart = new Chart(ctx, {
@@ -361,48 +324,31 @@ function initTempHumChart() {
                     data: chartData.suhu,
                     borderColor: '#e74c3c',
                     backgroundColor: 'rgba(231, 76, 60, 0.1)',
-                    borderWidth: 3,
-                    tension: 0.4,
-                    fill: true,
-                    pointRadius: 4,
-                    pointHoverRadius: 6,
-                    pointBackgroundColor: '#e74c3c',
-                    pointBorderColor: '#fff',
-                    pointBorderWidth: 2
+                    borderWidth: 3, tension: 0.4, fill: true,
+                    pointRadius: 4, pointHoverRadius: 6,
+                    pointBackgroundColor: '#e74c3c', pointBorderColor: '#fff', pointBorderWidth: 2
                 },
                 {
                     label: 'Kelembapan (%)',
                     data: chartData.kelembapan,
                     borderColor: '#3498db',
                     backgroundColor: 'rgba(52, 152, 219, 0.1)',
-                    borderWidth: 3,
-                    tension: 0.4,
-                    fill: true,
-                    pointRadius: 4,
-                    pointHoverRadius: 6,
-                    pointBackgroundColor: '#3498db',
-                    pointBorderColor: '#fff',
-                    pointBorderWidth: 2
+                    borderWidth: 3, tension: 0.4, fill: true,
+                    pointRadius: 4, pointHoverRadius: 6,
+                    pointBackgroundColor: '#3498db', pointBorderColor: '#fff', pointBorderWidth: 2
                 }
             ]
         },
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
+            responsive: true, maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
             plugins: {
-                legend: {
-                    display: true, position: 'top',
-                    labels: { padding: 15, font: { size: 12, family: 'Poppins', weight: '500' }, usePointStyle: true }
-                },
-                tooltip: {
-                    enabled: true, backgroundColor: 'rgba(0,0,0,0.8)',
-                    padding: 12, cornerRadius: 8, displayColors: true
-                }
+                legend: { display: true, position: 'top', labels: { padding: 15, font: { size: 12, family: 'Poppins', weight: '500' }, usePointStyle: true } },
+                tooltip: { enabled: true, backgroundColor: 'rgba(0,0,0,0.8)', padding: 12, cornerRadius: 8, displayColors: true }
             },
             scales: {
                 x: { display: true, grid: { display: false }, ticks: { font: { size: 11 }, maxRotation: 45 } },
-                y: { display: true, beginAtZero: false, grid: { color: 'rgba(45,122,62,0.1)', borderDash: [5,5] }, ticks: { font: { size: 11 } } }
+                y: { display: true, beginAtZero: true, min: 0, max: 50, grid: { color: 'rgba(45,122,62,0.1)', borderDash: [5,5] }, ticks: { font: { size: 11 } } }
             },
             animation: { duration: 500, easing: 'easeInOutQuart' }
         }
@@ -412,7 +358,6 @@ function initTempHumChart() {
 function initGasFireChart() {
     const ctx = document.getElementById('gasFireChart');
     if (!ctx) return;
-
     if (gasFireChart) { gasFireChart.destroy(); gasFireChart = null; }
 
     gasFireChart = new Chart(ctx, {
@@ -425,44 +370,27 @@ function initGasFireChart() {
                     data: chartData.gas,
                     borderColor: '#9b59b6',
                     backgroundColor: 'rgba(155, 89, 182, 0.1)',
-                    borderWidth: 3,
-                    tension: 0.4,
-                    fill: true,
-                    pointRadius: 4,
-                    pointHoverRadius: 6,
-                    pointBackgroundColor: '#9b59b6',
-                    pointBorderColor: '#fff',
-                    pointBorderWidth: 2
+                    borderWidth: 3, tension: 0.4, fill: true,
+                    pointRadius: 4, pointHoverRadius: 6,
+                    pointBackgroundColor: '#9b59b6', pointBorderColor: '#fff', pointBorderWidth: 2
                 },
                 {
                     label: 'Api (analog)',
                     data: chartData.api,
                     borderColor: '#f39c12',
                     backgroundColor: 'rgba(243, 156, 18, 0.1)',
-                    borderWidth: 3,
-                    tension: 0.4,
-                    fill: true,
-                    pointRadius: 4,
-                    pointHoverRadius: 6,
-                    pointBackgroundColor: '#f39c12',
-                    pointBorderColor: '#fff',
-                    pointBorderWidth: 2
+                    borderWidth: 3, tension: 0.4, fill: true,
+                    pointRadius: 4, pointHoverRadius: 6,
+                    pointBackgroundColor: '#f39c12', pointBorderColor: '#fff', pointBorderWidth: 2
                 }
             ]
         },
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
+            responsive: true, maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
             plugins: {
-                legend: {
-                    display: true, position: 'top',
-                    labels: { padding: 15, font: { size: 12, family: 'Poppins', weight: '500' }, usePointStyle: true }
-                },
-                tooltip: {
-                    enabled: true, backgroundColor: 'rgba(0,0,0,0.8)',
-                    padding: 12, cornerRadius: 8, displayColors: true
-                }
+                legend: { display: true, position: 'top', labels: { padding: 15, font: { size: 12, family: 'Poppins', weight: '500' }, usePointStyle: true } },
+                tooltip: { enabled: true, backgroundColor: 'rgba(0,0,0,0.8)', padding: 12, cornerRadius: 8, displayColors: true }
             },
             scales: {
                 x: { display: true, grid: { display: false }, ticks: { font: { size: 11 }, maxRotation: 45 } },
@@ -473,12 +401,9 @@ function initGasFireChart() {
     });
 }
 
-// Dipanggil setiap kali data MQTT masuk — push ke chartData lalu update chart
 function updateCharts(data) {
     if (!data) return;
-
-    const now = new Date();
-    const timeLabel = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const timeLabel = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
     chartData.labels.push(timeLabel);
     chartData.suhu.push(data.suhu !== undefined ? data.suhu : null);
@@ -486,7 +411,6 @@ function updateCharts(data) {
     chartData.gas.push(data.gas !== undefined ? data.gas : null);
     chartData.api.push(data.api !== undefined ? data.api : null);
 
-    // Batasi titik yang ditampilkan
     if (chartData.labels.length > MAX_CHART_POINTS) {
         chartData.labels.shift();
         chartData.suhu.shift();
@@ -495,13 +419,11 @@ function updateCharts(data) {
         chartData.api.shift();
     }
 
-    // Update chart — gunakan 'active' agar animasi tetap jalan
     if (tempHumChart) tempHumChart.update();
     if (gasFireChart) gasFireChart.update();
 }
 
 function resetChartData() {
-    // Gunakan splice agar referensi array di Chart.js tidak putus
     chartData.labels.splice(0);
     chartData.suhu.splice(0);
     chartData.kelembapan.splice(0);
@@ -511,11 +433,9 @@ function resetChartData() {
     if (gasFireChart) gasFireChart.update();
 }
 
-// Load data history ke chart saat pertama load (agar chart tidak kosong)
 function loadHistoricalDataToCharts() {
     const history = getHistoryData();
 
-    // Kosongkan dengan splice agar referensi array di Chart.js tetap sama
     chartData.labels.splice(0);
     chartData.suhu.splice(0);
     chartData.kelembapan.splice(0);
@@ -529,21 +449,17 @@ function loadHistoricalDataToCharts() {
     }
 
     const dataToLoad = history.slice(0, MAX_CHART_POINTS).reverse();
-
     dataToLoad.forEach(entry => {
-        const date = new Date(entry.timestamp);
-        const timeLabel = date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-
+        const timeLabel = new Date(entry.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         chartData.labels.push(timeLabel);
-        chartData.suhu.push(entry.suhu !== undefined && entry.suhu !== null ? entry.suhu : null);
-        chartData.kelembapan.push(entry.kelembapan !== undefined && entry.kelembapan !== null ? entry.kelembapan : null);
-        chartData.gas.push(entry.gas !== undefined && entry.gas !== null ? entry.gas : null);
-        chartData.api.push(entry.api !== undefined && entry.api !== null ? entry.api : null);
+        chartData.suhu.push(entry.suhu ?? null);
+        chartData.kelembapan.push(entry.kelembapan ?? null);
+        chartData.gas.push(entry.gas ?? null);
+        chartData.api.push(entry.api ?? null);
     });
 
     if (tempHumChart) tempHumChart.update();
     if (gasFireChart) gasFireChart.update();
-
     console.log('Loaded historical data to charts:', dataToLoad.length, 'points');
 }
 
@@ -608,27 +524,21 @@ function initChatbot() {
         chatbotOpen = !chatbotOpen;
         chatbotModal.classList.toggle('active', chatbotOpen);
     });
-
     chatbotClose.addEventListener('click', () => {
         chatbotOpen = false;
         chatbotModal.classList.remove('active');
     });
-
     chatSendBtn.addEventListener('click', () => {
         const message = chatInput.value.trim();
         if (message) { sendMessage(message); chatInput.value = ''; }
     });
-
     chatInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
             const message = chatInput.value.trim();
             if (message) { sendMessage(message); chatInput.value = ''; }
         }
     });
-
-    suggestionBtns.forEach(btn => {
-        btn.addEventListener('click', () => sendMessage(btn.dataset.question));
-    });
+    suggestionBtns.forEach(btn => btn.addEventListener('click', () => sendMessage(btn.dataset.question)));
 }
 
 function sendMessage(message) {
@@ -641,11 +551,11 @@ function addChatMessage(message, sender) {
     const messageDiv = document.createElement('div');
     messageDiv.className = 'chat-message ' + sender;
 
-    const avatar    = document.createElement('div');
+    const avatar = document.createElement('div');
     avatar.className = 'message-avatar';
     avatar.innerHTML = sender === 'bot' ? '<i class="fas fa-robot"></i>' : '<i class="fas fa-user"></i>';
 
-    const content   = document.createElement('div');
+    const content = document.createElement('div');
     content.className = 'message-content';
     if (sender === 'user') content.textContent = message;
     else content.innerHTML = message;
@@ -680,20 +590,6 @@ function processMessage(message) {
 <strong>Gejala:</strong> Bercak putih seperti tepung, bercak hitam/coklat, daun busuk<br><br>
 <strong>Solusi:</strong><br>1. Neem oil: 2x seminggu<br>2. Baking soda: 1 sdt + 1 liter air + sabun<br>3. Susu spray: susu:air = 1:9<br>4. Potong bagian terinfeksi`;
     }
-    if (m.includes('cahaya') || m.includes('lux') || m.includes('ldr') || m.includes('terang') || m.includes('gelap')) {
-        return `<strong>Sensor Cahaya (LDR/BH1750):</strong><br><br>
-Mengukur intensitas cahaya di dalam gudang penyimpanan tanaman.<br><br>
-<strong>Klasifikasi Cahaya:</strong><br>
-- 🌑 <strong>&lt; 200 lux</strong>: Gelap — perlu tambahan lampu grow light<br>
-- 🌤 <strong>200–999 lux</strong>: Normal — kondisi ideal untuk gudang<br>
-- ☀ <strong>1000–2999 lux</strong>: Terang — pantau suhu tanaman<br>
-- 🔆 <strong>≥ 3000 lux</strong>: Terik! — berisiko membakar daun & memicu api<br><br>
-<strong>Tips Pencahayaan:</strong><br>
-- Gunakan tirai/paranet jika cahaya terik<br>
-- Saat gelap, aktifkan grow light LED<br>
-- Cek sensor cahaya bersamaan dengan suhu`;
-    }
-
     if (m.includes('pir') || m.includes('gerak') || m.includes('motion')) {
         return `<strong>Sensor PIR (Passive Infrared):</strong><br><br>
 Mendeteksi gerakan manusia atau hewan di sekitar gudang berdasarkan perubahan radiasi inframerah.<br><br>
@@ -720,16 +616,8 @@ Coba tanyakan: "Bagaimana cara membuat spray sereh?" atau "Apa itu sensor PIR?"`
 let currentPage = 1;
 const rowsPerPage = 10;
 
-// Dipanggil dari addToHistory — TIDAK reset currentPage agar paginasi tidak lompat
-function refreshHistoryTable() {
-    renderHistoryTable();
-}
-
-// Reset ke halaman 1 hanya saat user klik clear atau pertama load
-function initHistoryTable() {
-    currentPage = 1;
-    renderHistoryTable();
-}
+function refreshHistoryTable() { renderHistoryTable(); }
+function initHistoryTable()    { currentPage = 1; renderHistoryTable(); }
 
 function renderHistoryTable() {
     const data  = getHistoryData();
@@ -737,7 +625,7 @@ function renderHistoryTable() {
     if (!tbody) return;
 
     if (!data || data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="no-data">Belum ada data</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="no-data">Belum ada data</td></tr>';
         updatePagination(0);
         return;
     }
@@ -751,39 +639,26 @@ function renderHistoryTable() {
     tbody.innerHTML = '';
     pageData.forEach(entry => {
         const row     = document.createElement('tr');
-        const date    = new Date(entry.timestamp);
-        const timeStr = date.toLocaleString('id-ID', {
+        const timeStr = new Date(entry.timestamp).toLocaleString('id-ID', {
             day: '2-digit', month: '2-digit', year: 'numeric',
             hour: '2-digit', minute: '2-digit', second: '2-digit'
         });
 
-        const suhu       = (entry.suhu !== undefined && entry.suhu !== null)
-                           ? entry.suhu.toFixed(1) + ' °C' : '-';
-        const kelembapan = (entry.kelembapan !== undefined && entry.kelembapan !== null)
-                           ? entry.kelembapan.toFixed(1) + ' %' : '-';
-        const gas        = (entry.gas !== undefined && entry.gas !== null)
-                           ? Math.round(entry.gas) : '-';
-        const api        = (entry.api !== undefined && entry.api !== null)
-                           ? Math.round(entry.api) : '-';
-        const jarak      = (entry.jarak !== undefined && entry.jarak !== null && entry.jarak > 0)
-                           ? entry.jarak.toFixed(1) + ' cm' : '-';
-        const pirVal     = entry.pir !== undefined
-                           ? (entry.pir === 1 ? '⚠ ADA' : '✔ AMAN') : '-';
+        const suhu       = (entry.suhu != null)       ? entry.suhu.toFixed(1) + ' °C' : '-';
+        const kelembapan = (entry.kelembapan != null)  ? entry.kelembapan.toFixed(1) + ' %' : '-';
+        const gas        = (entry.gas != null)         ? Math.round(entry.gas) : '-';
+        const api        = (entry.api != null)         ? Math.round(entry.api) : '-';
+        const jarak      = (entry.jarak != null && entry.jarak > 0) ? entry.jarak.toFixed(1) + ' cm' : '-';
 
-        // Cahaya: klasifikasi level
-        let cahayaVal = '-', cahayaLevel = 'cahaya-normal';
-        if (entry.cahaya !== undefined && entry.cahaya !== null) {
-            cahayaVal = Math.round(entry.cahaya);
-            if (entry.cahaya < 200)       cahayaLevel = 'cahaya-gelap';
-            else if (entry.cahaya < 1000) cahayaLevel = 'cahaya-normal';
-            else if (entry.cahaya < 3000) cahayaLevel = 'cahaya-terang';
-            else                          cahayaLevel = 'cahaya-terik';
-        }
+        const pirNorm = (entry.pir === true || entry.pir === 1) ? 1 : 0;
+        const pirVal  = pirNorm === 1 ? '⚠ ADA' : '✔ AMAN';
+        const pirCls  = pirNorm === 1 ? 'pir-alert' : 'pir-safe';
 
-        const status     = entry.status
-                           ? entry.status.replace(/[^\x00-\x7F]/g, '').trim() || entry.status
-                           : '-';
+        const status = entry.status
+                       ? entry.status.replace(/[^\x00-\x7F]/g, '').trim() || entry.status
+                       : '-';
 
+        // Kolom cahaya dihapus — colspan jadi 8
         row.innerHTML =
             '<td>' + timeStr + '</td>' +
             '<td>' + suhu + '</td>' +
@@ -791,8 +666,7 @@ function renderHistoryTable() {
             '<td>' + gas + '</td>' +
             '<td>' + api + '</td>' +
             '<td>' + jarak + '</td>' +
-            '<td><span class="pir-table ' + (entry.pir === 1 ? 'pir-alert' : 'pir-safe') + '">' + pirVal + '</span></td>' +
-            '<td><span class="cahaya-table ' + cahayaLevel + '">' + cahayaVal + '</span></td>' +
+            '<td><span class="pir-table ' + pirCls + '">' + pirVal + '</span></td>' +
             '<td><span class="status-badge">' + status + '</span></td>';
 
         tbody.appendChild(row);
@@ -843,8 +717,7 @@ function initRealtimeClock() {
 function updateClock() {
     const clockDisplay = document.getElementById('clockDisplay');
     if (!clockDisplay) return;
-    const now = new Date();
-    clockDisplay.textContent = now.toLocaleDateString('id-ID', {
+    clockDisplay.textContent = new Date().toLocaleDateString('id-ID', {
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
         hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
     });
@@ -882,14 +755,15 @@ window.debugInfo = function() {
 
 document.addEventListener('DOMContentLoaded', () => {
     loadHistoryFromLocalStorage();
+
+    // FIX: Chart diinit SEBELUM MQTT agar object chart sudah ada
+    // saat data pertama masuk dan updateCharts() dipanggil
+    initCharts();
+    loadHistoricalDataToCharts();
+
     initMQTT();
     initChatbot();
     initMainApp();
-
-    setTimeout(() => {
-        initCharts();
-        loadHistoricalDataToCharts();
-    }, 500);
 
     console.log('SmartFarm App Ready');
 });
