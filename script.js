@@ -125,79 +125,81 @@ const chatDB = [
   {
     keywords: ['tikus', 'mouse', 'rat', 'rodent'],
     answer: `🐀 <strong>Mengatasi Tikus di Gudang secara Alami:</strong><br><br>
-<ul>
-  <li>Tutup semua celah dan lubang &gt;0.5 cm dengan kawat besi atau semen</li>
-  <li>Simpan hasil panen dalam wadah plastik/logam tertutup rapat</li>
-  <li>Taburkan <strong>bubuk cabai atau kapur barus</strong> di sudut gudang</li>
-  <li>Pasang perangkap lem atau perangkap hidup tanpa racun</li>
-  <li>Letakkan daun <strong>mint kering atau lavender</strong> — tikus tidak suka aromanya</li>
-  <li>Bersihkan sisa makanan dan sampah organik setiap hari</li>
-</ul>
+ <ul>
+          <li>Tutup semua celah masuk gudang</li>
+          <li>Simpan hasil panen dalam wadah tertutup rapat dalam gudang</li>
+          <li>Pasang perangkap ultrasonik di sudut gudang (opsional)</li>
+          <li>Tanam tanaman pengusir (minimal, lavender) di sekitar gudang</li>
+        </ul>
 ⚠️ Hindari racun tikus karena berbahaya untuk hewan lain dan meninggalkan bau.`
   },
   {
-    keywords: ['kumbang', 'serangga', 'beetle', 'insect', 'kutu', 'thrips', 'semut', 'lalat', 'nyamuk', 'ngengat'],
+    keywords: ['kumbang', 'serangga', 'beetle', 'insect', 'kutu', 'thrips', 'semut', 'lalat', 'nyamuk'],
     answer: `🪲 <strong>Mengatasi Kumbang & Serangga di Gudang:</strong><br><br>
-<ul>
-  <li>Jaga <strong>kelembapan 50–65%</strong> — serangga berkembang di udara lembap</li>
-  <li>Semprot <strong>ekstrak serai</strong> di ventilasi dan sudut gudang setiap 5 jam</li>
-  <li>Pasang <strong>lampu UV perangkap</strong> serangga di malam hari</li>
-  <li>Gunakan <strong>neem oil (minyak mimba)</strong> 5ml/liter air, semprot seminggu sekali</li>
-  <li>Bersihkan sisa biji/produk yang berceceran segera</li>
-  <li>Pasang jaring halus (mesh) pada semua ventilasi</li>
-</ul>
+ <ul>
+          <li>Jaga kelembapan gudang 40–65% (tidak terlalu lembap)</li>
+          <li>Gunakan lampu UV perangkap serangga malam hari (jika ingin menggunakan)</li>
+          <li>Semprot serai secara rutin tiap 5 jam (mengikuti sistem otomatis)</li>
+          <li>Bersihkan sisa-sisa biji/produk yang berserakan</li>
+        </ul>
 💡 Kombinasi serai + neem oil sangat efektif untuk kebanyakan serangga gudang.`
   },
   {
     keywords: ['jamur', 'kapang', 'mold', 'fungus', 'berjamur'],
     answer: `🍄 <strong>Mencegah & Mengatasi Jamur di Gudang:</strong><br><br>
-<ul>
-  <li>Jaga <strong>kelembapan di bawah 70%</strong> — gunakan sensor DHT22 untuk monitor</li>
-  <li>Pastikan ventilasi udara lancar, buka jendela di siang hari</li>
-  <li>Gunakan <strong>silica gel</strong> atau dehumidifier di area penyimpanan</li>
-  <li>Semprot larutan <strong>cuka putih encer (1:3)</strong> pada permukaan berjamur</li>
-  <li>Gunakan rak penyimpanan agar produk tidak menyentuh lantai langsung</li>
-</ul>
+ <ul>
+          <li>Pastikan ventilasi udara cukup lancar</li>
+          <li>Kelembapan dijaga di bawah 60%</li>
+          <li>Gunakan silica gel (untuk gudang kecil) atau dehumidifier</li>
+          <li>Periksa kondisi rutin tiap minggu</li>
+        </ul>
 ⚠️ Jika kelembapan &gt;80%, segera aktifkan kipas atau buka ventilasi!`
   },
   {
     keywords: ['ulat', 'larva', 'worm', 'caterpillar', 'belatung'],
     answer: `🐛 <strong>Mengatasi Ulat & Larva di Gudang:</strong><br><br>
-<ul>
-  <li>Pasang <strong>jaring halus</strong> pada semua lubang ventilasi</li>
-  <li>Semprot <strong>neem oil 5ml/liter air</strong> setiap 3 hari — efektif bunuh larva</li>
-  <li>Periksa semua kemasan produk secara berkala untuk deteksi awal</li>
-  <li>Hindari menumpuk produk terlalu padat — beri jarak sirkulasi udara</li>
-  <li>Gunakan <strong>Bacillus thuringiensis (Bt)</strong> — pestisida biologis aman</li>
-</ul>
+ <ul>
+          <li>Gunakan jaring halus pada ventilasi</li>
+          <li>Semprot neem oil (minyak mimba) tiap 3 hari</li>
+          <li>Periksa kemasan produk secara berkala</li>
+          <li>Hindari menumpuk produk terlalu padat</li>
+        </ul>
 💡 Ulat biasanya masuk lewat ventilasi atau produk yang sudah terinfeksi.`
   },
   {
     keywords: ['serai', 'sereh', 'lemongrass', 'semprot', 'spray', 'ekstrak', 'membuat', 'buat'],
     answer: `🌿 <strong>Cara Membuat Semprot Ekstrak Serai:</strong><br><br>
-<strong>Bahan:</strong> 200g batang serai segar + 1 liter air + 5ml sabun cuci cair<br><br>
+<strong>Bahan:</strong>
+<ul>
+  <li>200g batang serai segar</li>
+  <li>1 liter air bersih</li>
+  <li>5ml sabun cuci cair (sebagai emulsifier alami)</li>
+</ul>
+
 <strong>Langkah:</strong>
 <ul>
-  <li>Rebus serai selama <strong>15 menit</strong> hingga air kuning kehijauan</li>
-  <li>Dinginkan, saring dengan kain kasa</li>
-  <li>Campurkan 500ml ekstrak + 500ml air + 5ml sabun cair</li>
-  <li>Masukkan ke botol semprot, semprot jarak <strong>20–30cm</strong></li>
+  <li>Rebus batang serai selama <strong>15 menit</strong> hingga air berubah <strong>kuning kehijauan</strong>.</li>
+  <li>Dinginkan hingga suhu ruangan lalu <strong>saring menggunakan kain kasa</strong> untuk memisahkan ampas.</li>
+  <li>Campurkan <strong>500ml ekstrak serai</strong> dengan <strong>500ml air bersih</strong>.</li>
+  <li>Tambahkan <strong>5ml sabun cair</strong> lalu aduk hingga merata.</li>
+  <li>Masukkan larutan ke dalam <strong>botol semprot</strong>.</li>
+  <li>Semprotkan pada sudut gudang atau ventilasi dengan jarak <strong>20–30 cm</strong>.</li>
 </ul>
-<strong>Jadwal:</strong> Setiap <strong>5 jam</strong> (normal) atau <strong>3 jam</strong> jika kelembapan &gt;80%<br>
-⚠️ Larutan bertahan maksimal <strong>3 hari</strong>. Buat ulang jika berbau asam.`
-  },
-  {
-    keywords: ['neem', 'mimba', 'minyak mimba', 'neem oil'],
-    answer: `🌱 <strong>Penggunaan Neem Oil (Minyak Mimba):</strong><br><br>
+
+<strong>Jadwal:</strong>
 <ul>
-  <li><strong>Dosis:</strong> 5ml neem oil + 1 liter air + 2ml sabun cair sebagai emulsifier</li>
-  <li>Kocok hingga merata sebelum disemprotkan</li>
-  <li>Semprot malam hari agar tidak cepat menguap</li>
-  <li>Frekuensi: <strong>setiap 3–7 hari</strong> tergantung tingkat serangan</li>
-  <li>Efektif untuk: ulat, thrips, kutu daun, tungau, serangga kecil</li>
+  <li>Penyemprotan setiap <strong>5 jam</strong> pada kondisi normal.</li>
+  <li>Jika kelembapan <strong>>80%</strong>, percepat menjadi setiap <strong>3 jam</strong>.</li>
 </ul>
-💡 Simpan neem oil di tempat gelap dan sejuk — tahan 1–2 tahun jika tersegel.`
+
+<strong>Penyimpanan:</strong>
+<ul>
+  <li>Simpan di tempat <strong>sejuk dan gelap</strong>.</li>
+  <li>Larutan bertahan maksimal <strong>3 hari</strong>.</li>
+  <li>Buat ulang jika larutan <strong>berbau asam atau berubah warna</strong>.</li>
+</ul>.`
   },
+
   {
     keywords: ['suhu', 'panas', 'temperature', 'terlalu panas', 'suhu tinggi'],
     answer: `🌡️ <strong>Mengatasi Suhu Gudang Terlalu Tinggi (&gt;32°C):</strong><br><br>
@@ -241,7 +243,7 @@ const chatDB = [
   <li>💨 <strong>MQ135</strong> — Kualitas udara dalam PPM</li>
   <li>🔥 <strong>Sensor Api</strong> — Deteksi infrared nyala api</li>
   <li>👁️ <strong>PIR HC-SR501</strong> — Deteksi gerak/kehadiran orang</li>
-  <li>📦 <strong>Ultrasonik HC-SR04</strong> — Kapasitas box penyimpanan</li>
+  <li>📦 <strong>Ultrasonik </strong> — Kapasitas box penyimpanan</li>
 </ul>
 Semua data dikirim via <strong>MQTT</strong> ke broker EMQX setiap 2 detik dan tampil real-time di dashboard.`
   },
@@ -250,7 +252,7 @@ Semua data dikirim via <strong>MQTT</strong> ke broker EMQX setiap 2 detik dan t
     answer: `🌾 <strong>Hama Utama Gudang Beras & Cara Mengatasinya:</strong><br><br>
 <ul>
   <li>🪲 <strong>Kumbang beras</strong> — Simpan dalam wadah kedap udara, semprot neem oil</li>
-  <li>🐛 <strong>Bubuk beras</strong> — Jaga suhu &lt;28°C, gunakan silica gel</li>
+  <li>🐛 <strong>Ulat beras</strong> — Jaga suhu &lt;28°C, gunakan silica gel</li>
   <li>🐀 <strong>Tikus</strong> — Pasang perangkap, tutup celah, gunakan mint</li>
   <li>🍄 <strong>Aflatoksin (jamur)</strong> — Jaga kelembapan &lt;65%</li>
 </ul>
