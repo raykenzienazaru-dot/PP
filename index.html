@@ -24,7 +24,50 @@
       <li><a href="#sensor">Sensor</a></li>
     </ul>
     <button class="nav-chat-btn" id="openChatBtn">💬 Tanya AI</button>
+
+    <!-- HAMBURGER -->
+    <button class="hamburger" id="hamburgerBtn" aria-label="Buka menu navigasi" aria-expanded="false">
+      <span class="ham-line"></span>
+      <span class="ham-line"></span>
+      <span class="ham-line"></span>
+    </button>
   </nav>
+
+  <!-- MOBILE MENU -->
+  <div class="mobile-overlay" id="mobileOverlay"></div>
+  <div class="mobile-menu" id="mobileMenu" aria-hidden="true">
+    <div class="mobile-menu-header">
+      <div class="nav-logo">
+        <span class="logo-icon">🌿</span>
+        <span class="logo-text">Smart<b>Eco</b>Farm</span>
+      </div>
+      <button class="mobile-close" id="mobileClose" aria-label="Tutup menu">✕</button>
+    </div>
+
+    <nav class="mobile-nav">
+      <a href="#hero"   class="mobile-nav-item" data-i="0"><span class="mnav-icon">🏠</span><span>Beranda</span></a>
+      <a href="#fitur"  class="mobile-nav-item" data-i="1"><span class="mnav-icon">⚙️</span><span>Fitur</span></a>
+      <a href="#hama"   class="mobile-nav-item" data-i="2"><span class="mnav-icon">🐛</span><span>Panduan Hama</span></a>
+      <a href="#serai"  class="mobile-nav-item" data-i="3"><span class="mnav-icon">🌿</span><span>Ekstrak Serai</span></a>
+      <a href="#sensor" class="mobile-nav-item" data-i="4"><span class="mnav-icon">📊</span><span>Sensor IoT</span></a>
+    </nav>
+
+    <div class="mobile-divider"></div>
+
+    <button class="mobile-chat-cta" id="mobileChatBtn">
+      <span>💬</span>
+      <span>Chat dengan EcoBot AI</span>
+      <span class="mcta-arrow">→</span>
+    </button>
+
+    <div class="mobile-menu-footer">
+      <div class="mobile-status-badge">
+        <span class="status-dot"></span>
+        <span>Sistem Aktif 24/7</span>
+      </div>
+      <p>© 2025 SmartEcoFarm</p>
+    </div>
+  </div>
 
   <!-- HERO -->
   <section id="hero">
@@ -116,7 +159,6 @@
     <div class="section-label">Panduan Lengkap</div>
     <h2 class="section-title">Menghindari & Mengendalikan Hama</h2>
     <div class="hama-grid">
-
       <div class="hama-card">
         <div class="hama-icon">🐀</div>
         <h3>Tikus</h3>
@@ -128,7 +170,6 @@
         </ul>
         <div class="hama-tag">Risiko: Tinggi</div>
       </div>
-
       <div class="hama-card">
         <div class="hama-icon">🪲</div>
         <h3>Kumbang & Serangga</h3>
@@ -140,7 +181,6 @@
         </ul>
         <div class="hama-tag warning">Risiko: Sedang</div>
       </div>
-
       <div class="hama-card">
         <div class="hama-icon">🍄</div>
         <h3>Jamur & Kapang</h3>
@@ -152,7 +192,6 @@
         </ul>
         <div class="hama-tag warning">Risiko: Sedang</div>
       </div>
-
       <div class="hama-card">
         <div class="hama-icon">🐛</div>
         <h3>Ulat & Larva</h3>
@@ -164,7 +203,6 @@
         </ul>
         <div class="hama-tag low">Risiko: Rendah</div>
       </div>
-
     </div>
     <div class="hama-tips">
       <div class="tips-icon">💡</div>
@@ -182,7 +220,6 @@
     <h2 class="section-title">Panduan Semprot Ekstrak Serai</h2>
     <div class="serai-layout">
       <div class="serai-steps">
-
         <div class="step">
           <div class="step-num">01</div>
           <div class="step-content">
@@ -190,7 +227,6 @@
             <p>Siapkan 200g batang serai segar, 1 liter air bersih, dan 5ml sabun cuci cair sebagai emulsifier alami.</p>
           </div>
         </div>
-
         <div class="step">
           <div class="step-num">02</div>
           <div class="step-content">
@@ -198,7 +234,6 @@
             <p>Rebus serai selama 15 menit hingga air berubah kuning kehijauan. Dinginkan hingga suhu ruangan, lalu saring menggunakan kain kasa.</p>
           </div>
         </div>
-
         <div class="step">
           <div class="step-num">03</div>
           <div class="step-content">
@@ -206,7 +241,6 @@
             <p>Campurkan 500ml ekstrak serai dengan 500ml air bersih. Tambahkan 5ml sabun cair, aduk merata. Masukkan ke botol semprot 1 liter.</p>
           </div>
         </div>
-
         <div class="step">
           <div class="step-num">04</div>
           <div class="step-content">
@@ -214,7 +248,6 @@
             <p>Semprot di sudut-sudut gudang, ventilasi, dan area penyimpanan. Jarak semprot 20–30cm. Hindari menyemprot langsung ke produk pangan.</p>
           </div>
         </div>
-
         <div class="step">
           <div class="step-num">05</div>
           <div class="step-content">
@@ -222,7 +255,6 @@
             <p>Semprot setiap <strong>5 jam</strong> dalam kondisi normal. Jika kelembapan >80%, percepat menjadi setiap <strong>3 jam</strong>. Sensor IoT akan mengingatkan otomatis.</p>
           </div>
         </div>
-
         <div class="step">
           <div class="step-num">06</div>
           <div class="step-content">
@@ -230,9 +262,7 @@
             <p>Simpan sisa larutan di tempat sejuk dan gelap. Maksimal bertahan <strong>3 hari</strong> sebelum efektivitasnya berkurang. Buat ulang jika berbau asam.</p>
           </div>
         </div>
-
       </div>
-
       <div class="serai-info">
         <div class="info-card">
           <h3>🌿 Kandungan Aktif Serai</h3>
@@ -322,7 +352,6 @@
 
   <!-- CHATBOT -->
   <div class="chat-bubble" id="chatBubble" title="Tanya AI">💬</div>
-
   <div class="chat-window" id="chatWindow">
     <div class="chat-header">
       <div class="chat-header-info">
@@ -334,7 +363,6 @@
       </div>
       <button class="chat-close" id="closeChat">✕</button>
     </div>
-
     <div class="chat-messages" id="chatMessages">
       <div class="msg bot">
         <div class="msg-bubble">
@@ -349,14 +377,12 @@
         </div>
       </div>
     </div>
-
     <div class="chat-suggestions">
       <button class="suggest-btn" data-q="Bagaimana cara mengusir tikus dari gudang secara alami?">🐀 Usir tikus</button>
       <button class="suggest-btn" data-q="Berikan panduan lengkap membuat semprot ekstrak serai untuk gudang pertanian">🌿 Buat semprot serai</button>
       <button class="suggest-btn" data-q="Kelembapan gudang 85%, apa yang harus dilakukan?">💧 Kelembapan tinggi</button>
       <button class="suggest-btn" data-q="Apa saja hama berbahaya di gudang beras dan cara mengatasinya?">🌾 Hama gudang beras</button>
     </div>
-
     <div class="chat-input-area">
       <input type="text" id="chatInput" placeholder="Tanya soal hama atau semprot serai..." />
       <button id="sendBtn">➤</button>

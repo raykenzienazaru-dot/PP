@@ -3,7 +3,67 @@
 //   Chatbot JS Lokal + MQTT Real Data ESP32
 // ============================================
 
-// ===== CHATBOT TOGGLE =====
+// ============================================
+//   MOBILE NAVIGATION
+// ============================================
+const hamburgerBtn  = document.getElementById('hamburgerBtn');
+const mobileMenu    = document.getElementById('mobileMenu');
+const mobileOverlay = document.getElementById('mobileOverlay');
+const mobileClose   = document.getElementById('mobileClose');
+const mobileChatBtn = document.getElementById('mobileChatBtn');
+
+function openMobileNav() {
+  hamburgerBtn.classList.add('is-open');
+  mobileMenu.classList.add('is-open');
+  mobileOverlay.classList.add('is-open');
+  document.body.classList.add('nav-open');
+  hamburgerBtn.setAttribute('aria-expanded', 'true');
+  mobileMenu.setAttribute('aria-hidden', 'false');
+}
+
+function closeMobileNav() {
+  hamburgerBtn.classList.remove('is-open');
+  mobileMenu.classList.remove('is-open');
+  mobileOverlay.classList.remove('is-open');
+  document.body.classList.remove('nav-open');
+  hamburgerBtn.setAttribute('aria-expanded', 'false');
+  mobileMenu.setAttribute('aria-hidden', 'true');
+}
+
+hamburgerBtn.addEventListener('click', () => {
+  mobileMenu.classList.contains('is-open') ? closeMobileNav() : openMobileNav();
+});
+
+// Tutup saat klik overlay
+mobileOverlay.addEventListener('click', closeMobileNav);
+
+// Tutup saat klik close button
+mobileClose.addEventListener('click', closeMobileNav);
+
+// Tutup saat klik link navigasi (scroll ke section)
+document.querySelectorAll('.mobile-nav-item').forEach(link => {
+  link.addEventListener('click', () => {
+    closeMobileNav();
+  });
+});
+
+// Tombol chat di mobile menu
+mobileChatBtn.addEventListener('click', () => {
+  closeMobileNav();
+  // Tunggu panel tutup dulu baru buka chat
+  setTimeout(openChat, 380);
+});
+
+// Tutup dengan tombol Escape
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && mobileMenu.classList.contains('is-open')) {
+    closeMobileNav();
+  }
+});
+
+// ============================================
+//   CHATBOT TOGGLE
+// ============================================
 const chatBubble   = document.getElementById('chatBubble');
 const chatWindow   = document.getElementById('chatWindow');
 const closeChat    = document.getElementById('closeChat');
@@ -26,7 +86,9 @@ openChatBtn.addEventListener('click', openChat);
 openChatBtn2.addEventListener('click', openChat);
 closeChat.addEventListener('click', closeChatFn);
 
-// ===== CHAT LOGIC =====
+// ============================================
+//   CHAT LOGIC
+// ============================================
 const messagesEl = document.getElementById('chatMessages');
 const inputEl    = document.getElementById('chatInput');
 const sendBtn    = document.getElementById('sendBtn');
